@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Security.Principal;
+using System.ComponentModel;
 using System.Windows;
 using System.Xml.Linq;
 using Microsoft.Win32;
@@ -24,15 +26,23 @@ public partial class MainWindow : Window
     }
 
     private List<WifiInterface> _interfaces = new();
+    private List<SavedWifiProfile> _savedProfiles = new();
+    private SavedWifiProfile? _selectedSavedProfile;
 
     public MainWindow()
     {
         InitializeComponent();
         Loaded += async (_, _) => await RefreshAllAsync();
+        Closed += (_, _) => { Connection1Password.Clear(); Connection2Password.Clear(); SavedPasswordHidden.Clear(); SavedPasswordVisible.Clear(); };
     }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e) => await RefreshAllAsync();
     private async void Scan_Click(object sender, RoutedEventArgs e) => await ScanNetworksAsync();
+    private async void SavedProfiles_Click(object sender, RoutedEventArgs e) => await RefreshSavedProfilesAsync();
+    private void SavedProfilesGrid_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e) => SelectSavedProfile();
+    private void ToggleSavedPassword_Click(object sender, RoutedEventArgs e) => ToggleSavedPassword();
+    private void UseSavedForConnection1_Click(object sender, RoutedEventArgs e) => UseSavedProfile(1);
+    private void UseSavedForConnection2_Click(object sender, RoutedEventArgs e) => UseSavedProfile(2);
     private async void Connect1_Click(object sender, RoutedEventArgs e) => await ConnectProfileAsync(1);
     private async void Connect2_Click(object sender, RoutedEventArgs e) => await ConnectProfileAsync(2);
     private async void Disconnect1_Click(object sender, RoutedEventArgs e) => await DisconnectProfileAsync(1);
@@ -59,15 +69,15 @@ public partial class MainWindow : Window
             UpdateProfileStatus(1);
             UpdateProfileStatus(2);
 
-            if (_interfaces.Count >= 2)
-                HardwareStatus.Text = $"{_interfaces.Count} wireless interface(s) detected. Assign different adapters to Connection 1 and Connection 2 for two simultaneous Wi-Fi links.";
-            else if (_interfaces.Count == 1)
-                HardwareStatus.Text = "Only one wireless interface detected. You can configure both profiles, but this build needs a second independent Wi-Fi adapter (for example, a USB Wi-Fi adapter) to keep two networks connected simultaneously.";
-            else
-                HardwareStatus.Text = "No wireless interface was reported by Windows. Check that the Wi-Fi adapter is enabled and its driver is installed.";
+            var dualSta = await Task.Run(() => NativeWifiService.GetDualStaSummary());
+            var adapterSummary = _interfaces.Count == 0
+                ? "No wireless interfaces were reported by Windows."
+                : _interfaces.Count.ToString() + " Windows wireless interface(s) detected.";
+            HardwareStatus.Text = adapterSummary + Environment.NewLine + dualSta;
 
             await ScanNetworksAsync(showStatus: false);
-            StatusText.Text = $"Refresh complete: {_interfaces.Count} wireless interface(s) detected.";
+            await RefreshSavedProfilesAsync(showStatus: false);
+            StatusText.Text = "Refresh complete: " + _interfaces.Count + " wireless interface(s) detected; saved profiles loaded.";
         }
         catch (Exception ex)
         {
@@ -91,6 +101,174 @@ public partial class MainWindow : Window
         {
             NetworksOutput.Text = ex.Message;
             if (showStatus) StatusText.Text = "Wi-Fi scan failed: " + ex.Message;
+        }
+    }
+
+    private async Task RefreshSavedProfilesAsync(bool showStatus = true)
+    {
+        if (showStatus) StatusText.Text = "Reading saved Wi-Fi profiles from Windows...";
+        try
+        {
+            var selectedKey = _selectedSavedProfile?.AdapterGuid.ToString() + "|" + _selectedSavedProfile?.ProfileName;
+            _savedProfiles = await Task.Run(NativeWifiService.GetSavedProfiles);
+            SavedProfilesGrid.ItemsSource = _savedProfiles;
+            var selected = _savedProfiles.FirstOrDefault(p =>
+                string.Equals(p.AdapterGuid.ToString() + "|" + p.ProfileName, selectedKey, StringComparison.OrdinalIgnoreCase));
+            SavedProfilesGrid.SelectedItem = selected;
+            if (selected is null) ClearSavedProfileDetails();
+            if (showStatus) StatusText.Text = "Loaded " + _savedProfiles.Count + " saved Wi-Fi profile(s).";
+        }
+        catch (Exception ex)
+        {
+            _savedProfiles = new List<SavedWifiProfile>();
+            SavedProfilesGrid.ItemsSource = _savedProfiles;
+            ClearSavedProfileDetails();
+            SavedPasswordStatus.Text = "Could not read saved profiles: " + ex.Message;
+            if (showStatus) StatusText.Text = "Saved-profile refresh failed: " + ex.Message;
+        }
+    }
+
+    private void SelectSavedProfile()
+    {
+        _selectedSavedProfile = SavedProfilesGrid.SelectedItem as SavedWifiProfile;
+        SavedPasswordHidden.Clear();
+        SavedPasswordVisible.Clear();
+        SavedPasswordVisible.Visibility = Visibility.Collapsed;
+        SavedPasswordHidden.Visibility = Visibility.Visible;
+        SavedPasswordToggle.Content = "Show password";
+        SavedPasswordToggle.IsEnabled = _selectedSavedProfile is not null;
+        if (_selectedSavedProfile is null)
+        {
+            SavedProfileDetails.Text = "Select a saved network to view its details.";
+            SavedPasswordStatus.Text = "Passwords remain hidden until you choose Show password.";
+            return;
+        }
+
+        var profile = _selectedSavedProfile;
+        SavedProfileDetails.Text = profile.Ssid + "  |  Profile: " + profile.ProfileName + Environment.NewLine
+            + "Adapter: " + profile.AdapterName + "  |  Security: " + profile.Authentication;
+        if (profile.Password is not null)
+        {
+            SavedPasswordHidden.Password = profile.Password;
+            SavedPasswordVisible.Text = profile.Password;
+            SavedPasswordStatus.Text = "Password retrieved from the Windows profile. It is hidden by default.";
+        }
+        else if (profile.PasswordIsProtected)
+        {
+            SavedPasswordStatus.Text = "Windows returned an encrypted password. Run InfraLap as Administrator to request plain-text access.";
+        }
+        else
+        {
+            SavedPasswordStatus.Text = string.IsNullOrWhiteSpace(profile.PasswordStatus)
+                ? "No saved WPA2 password is available for this profile."
+                : profile.PasswordStatus;
+        }
+    }
+
+    private void ToggleSavedPassword()
+    {
+        if (_selectedSavedProfile is null) return;
+        if (_selectedSavedProfile.Password is null)
+        {
+            if (_selectedSavedProfile.PasswordIsProtected)
+                OfferAdministratorRestart();
+            else
+                MessageBox.Show(SavedPasswordStatus.Text, "Saved Wi-Fi password", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (SavedPasswordVisible.Visibility == Visibility.Visible)
+        {
+            SavedPasswordVisible.Visibility = Visibility.Collapsed;
+            SavedPasswordHidden.Visibility = Visibility.Visible;
+            SavedPasswordToggle.Content = "Show password";
+        }
+        else
+        {
+            SavedPasswordVisible.Text = _selectedSavedProfile.Password;
+            SavedPasswordVisible.Visibility = Visibility.Visible;
+            SavedPasswordHidden.Visibility = Visibility.Collapsed;
+            SavedPasswordToggle.Content = "Hide password";
+        }
+    }
+
+    private void UseSavedProfile(int slot)
+    {
+        if (_selectedSavedProfile is null)
+        {
+            MessageBox.Show("Select a saved Wi-Fi profile first.", "InfraLap MultiWiFi", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var profile = _selectedSavedProfile;
+        if (!profile.Authentication.Equals("WPA2PSK", StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show("This UAT connection editor currently creates WPA2-Personal profiles. The selected Windows profile uses '"
+                + profile.Authentication + "'. It is shown here, but cannot safely be converted by this WPA2-only connection workflow.",
+                "Unsupported saved profile type", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (profile.Password is null)
+        {
+            if (profile.PasswordIsProtected) OfferAdministratorRestart();
+            else MessageBox.Show("The saved profile does not contain a readable WPA2 passphrase.", "InfraLap MultiWiFi",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var adapter = _interfaces.FirstOrDefault(x => x.Name.Equals(profile.AdapterName, StringComparison.OrdinalIgnoreCase));
+        if (slot == 1)
+        {
+            Connection1Ssid.Text = profile.Ssid;
+            Connection1Password.Password = profile.Password;
+            if (adapter is not null) Connection1Adapter.SelectedItem = adapter;
+        }
+        else
+        {
+            Connection2Ssid.Text = profile.Ssid;
+            Connection2Password.Password = profile.Password;
+            if (adapter is not null) Connection2Adapter.SelectedItem = adapter;
+        }
+        StatusText.Text = "Loaded saved profile '" + profile.Ssid + "' into Connection " + slot + ". Press Connect to use it.";
+    }
+
+    private void ClearSavedProfileDetails()
+    {
+        _selectedSavedProfile = null;
+        SavedProfileDetails.Text = "Select a saved network to view its details.";
+        SavedPasswordHidden.Clear();
+        SavedPasswordVisible.Clear();
+        SavedPasswordVisible.Visibility = Visibility.Collapsed;
+        SavedPasswordHidden.Visibility = Visibility.Visible;
+        SavedPasswordToggle.Content = "Show password";
+        SavedPasswordToggle.IsEnabled = false;
+        SavedPasswordStatus.Text = "Passwords remain hidden until you choose Show password.";
+    }
+
+    private void OfferAdministratorRestart()
+    {
+        var answer = MessageBox.Show(
+            "Windows is returning this saved Wi-Fi key in encrypted form. Plain-text key retrieval is restricted by Windows and is normally available only to administrators. Restart InfraLap as Administrator and then select this profile again?",
+            "Administrator permission required",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (answer != MessageBoxResult.Yes) return;
+
+        try
+        {
+            var executable = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(executable))
+                throw new InvalidOperationException("The application executable path could not be determined.");
+            Process.Start(new ProcessStartInfo(executable) { UseShellExecute = true, Verb = "runas" });
+        }
+        catch (Win32Exception ex)
+        {
+            SavedPasswordStatus.Text = "Administrator restart was cancelled or blocked: " + ex.Message;
+        }
+        catch (Exception ex)
+        {
+            SavedPasswordStatus.Text = "Could not restart as Administrator: " + ex.Message;
         }
     }
 
@@ -270,6 +448,8 @@ public partial class MainWindow : Window
                     .AppendLine($"OS: {Environment.OSVersion}")
                     .AppendLine($"64-bit OS: {Environment.Is64BitOperatingSystem}")
                     .AppendLine("Passwords are not included in this report.")
+                    .AppendLine("=== Dual-STA readiness ===")
+                    .AppendLine(NativeWifiService.GetDualStaSummary())
                     .AppendLine()
                     .AppendLine("=== WLAN interfaces ===")
                     .AppendLine(interfaces.CombinedOutput)

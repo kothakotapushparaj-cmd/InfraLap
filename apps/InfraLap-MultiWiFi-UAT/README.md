@@ -1,31 +1,44 @@
-# InfraLap MultiWiFi — Two-profile UAT 0.5
+# InfraLap MultiWiFi — UAT 0.6
 
-## New in 0.5
-- Two independent connection cards, each with its own SSID and WPA2-Personal password.
-- Separate Wi-Fi adapter selection for each connection.
-- Import a temporary WLAN profile into the current Windows user profile, then request connection on the selected adapter.
-- Separate connect and disconnect actions and per-profile status.
-- Nearby network scan and password-free diagnostic export.
-- The app does not store passwords in its own settings. The temporary XML credential file is deleted after Windows imports it; Windows manages the saved WLAN profile.
+## New in 0.6
+- Lists saved WLAN profiles discovered through the Windows Native Wi-Fi API.
+- Displays SSID, Windows profile name, adapter and authentication type.
+- Passwords remain hidden by default. The selected saved password can be revealed or hidden.
+- Uses Windows' WLAN_PROFILE_GET_PLAINTEXT_KEY request. Windows controls whether the process has permission to return a plain-text key; if Windows returns an encrypted key, the app offers to restart as Administrator.
+- A selected saved WPA2-Personal profile can be loaded into either connection card.
+- Reports actual secondary STA interfaces and the synchronized-connection state exposed by the adapter driver.
+- Diagnostic exports include Dual-STA capability information but never Wi-Fi passwords.
 
-## Simultaneous connection requirement
-For this UAT build, assign a different physical Wi-Fi interface to each connection. Example: built-in Wi-Fi adapter for Connection 1 and a compatible USB Wi-Fi adapter for Connection 2.
+## Important Dual-STA limitation
+Windows documents the secondary STA connection as automatically synchronized with the primary STA connection. The documented API lets an app request secondary STA connectivity and query the secondary interface list; it does not document an app-controlled way to assign an arbitrary, independent second SSID and password to that secondary interface.
 
-If both profiles select the same interface, the app will save the second profile to Windows but will not switch that adapter away from the other profile. One conventional Wi-Fi interface should not be assumed to maintain two simultaneous independent associations. Windows Dual-STA support is not implemented in this build.
+Therefore this UAT build reports Dual-STA capability but does not claim that two different SSIDs can be independently connected through one physical adapter. That requirement needs validation against the target chipset, firmware and driver, and may not be supported by the Windows Dual-STA interface exposed to ordinary apps.
 
-## Security and supported authentication
-- This build targets WPA2-Personal with AES and passphrase passwords of 8–63 characters.
-- It does not support WPA-Enterprise/802.1X, captive portal logins, WEP, WPA3-SAE-specific setup or open networks yet.
-- Passwords are not printed into logs or diagnostic exports.
-- WLAN profiles are added for the current Windows user (user=current).
+## Existing connection workflow
+- Two WPA2-Personal connection cards, each with a separate SSID and password field.
+- Nearby Wi-Fi scan, adapter refresh, connect/disconnect actions and per-profile status.
+- Each profile is imported into the current Windows user profile. Temporary XML files are deleted after import.
+- Separate-adapter operation remains available when Windows exposes two independent WLAN interfaces.
+- This app does not bond internet bandwidth.
+
+## Password handling
+- InfraLap does not store passwords in its own settings or diagnostics.
+- Saved keys are read from Windows WLAN profiles only when requested in the saved-profile panel.
+- Plain-text password retrieval is controlled by Windows permissions and is normally restricted to Administrators.
+- Use Show/Hide to reveal or conceal the selected saved password. Passwords are hidden by default.
+- Passwords are not exported to diagnostic files.
+
+## Supported authentication in the connection cards
+The connection cards currently create WPA2-Personal (WPA2-PSK/AES) profiles and accept passphrases of 8–63 characters. Other saved profile types can be displayed, but they cannot currently be converted into the WPA2-only connection workflow.
 
 ## UAT checklist
 1. Install on Windows 11 x64.
-2. Connect built-in Wi-Fi and one additional USB Wi-Fi adapter.
-3. Refresh Wi-Fi adapters and ensure both appear with different interface names.
-4. Enter SSID/password for each connection and assign a different adapter to each.
-5. Connect Connection 1, then Connection 2.
-6. Refresh adapters and verify the two adapters show their respective SSIDs and connected state.
-7. Export diagnostics if either profile fails. The diagnostic file does not contain passwords.
+2. Refresh adapters and scan nearby networks.
+3. Refresh saved profiles and select a saved WPA2-Personal network.
+4. Verify that its password is hidden by default; use Show password and Hide password.
+5. Load the selected saved profile into Connection 1 or Connection 2.
+6. Check Dual-STA status. A secondary STA count of zero means the driver is not exposing a secondary interface.
+7. If a secondary STA is exposed, note that Windows documents the secondary connection as synchronized with the primary; do not treat this as proof of independent SSID selection.
+8. Export diagnostics and verify no passwords are present.
 
-This is an adapter/profile UAT. It does not bond internet bandwidth or create 2–5 radios in software.
+Windows 11 x64 UAT build. Not a bandwidth-bonding client.

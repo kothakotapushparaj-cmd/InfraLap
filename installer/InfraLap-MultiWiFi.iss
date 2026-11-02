@@ -1,5 +1,5 @@
 #define MyAppName "InfraLap MultiWiFi"
-#define MyAppVersion "0.5.0"
+#define MyAppVersion "0.6.0"
 #define MyAppPublisher "InfraLap Solutions"
 #define MyAppExeName "InfraLap.MultiWiFi.exe"
 
@@ -12,7 +12,7 @@ DefaultDirName={autopf}\InfraLap MultiWiFi
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=..\installer-output
-OutputBaseFilename=InfraLap-MultiWiFi-Setup-x64-v0.5
+OutputBaseFilename=InfraLap-MultiWiFi-Setup-x64-v0.6
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
 Compression=lzma2
