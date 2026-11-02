@@ -40,6 +40,27 @@
             <Setter Property="Foreground" Value="#172338"/>
             <Setter Property="BorderBrush" Value="#405474"/>
             <Setter Property="Padding" Value="7,5"/>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Foreground" Value="#172338"/>
+                        <Setter Property="Background" Value="#FFFFFF"/>
+                        <Setter Property="Padding" Value="9,7"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="BorderThickness" Value="0"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter Property="Background" Value="#DCEBFF"/>
+                                <Setter Property="Foreground" Value="#14243B"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="#C7DCFA"/>
+                                <Setter Property="Foreground" Value="#14243B"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
@@ -59,7 +80,7 @@
                            Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,4,0,0"/>
             </StackPanel>
             <Border DockPanel.Dock="Right" Background="#173B34" CornerRadius="10" Padding="12,8" VerticalAlignment="Center">
-                <TextBlock Text="V0.8 · SCAN-TO-SELECT SSID UAT" Foreground="#83E0B7" FontSize="11" FontWeight="Bold"/>
+                <TextBlock Text="V0.9 · SSID DROPDOWN VISIBILITY UAT" Foreground="#83E0B7" FontSize="11" FontWeight="Bold"/>
             </Border>
         </DockPanel>
 
@@ -115,8 +136,8 @@
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Margin="3,2">
-                                        <TextBlock Text="{Binding Ssid}" Foreground="#F3F6FC" FontWeight="SemiBold"/>
-                                        <TextBlock Text="{Binding DetailText}" Foreground="#A9B7CC" FontSize="10"/>
+                                        <TextBlock Text="{Binding Ssid}" Foreground="#172338" FontSize="12" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding DetailText}" Foreground="#52647D" FontSize="10" Margin="0,2,0,0"/>
                                     </StackPanel>
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
@@ -175,8 +196,8 @@
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Margin="3,2">
-                                        <TextBlock Text="{Binding Ssid}" Foreground="#F3F6FC" FontWeight="SemiBold"/>
-                                        <TextBlock Text="{Binding DetailText}" Foreground="#A9B7CC" FontSize="10"/>
+                                        <TextBlock Text="{Binding Ssid}" Foreground="#172338" FontSize="12" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding DetailText}" Foreground="#52647D" FontSize="10" Margin="0,2,0,0"/>
                                     </StackPanel>
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>

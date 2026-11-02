@@ -1,4 +1,4 @@
-# InfraLap MultiWiFi — UAT 0.8
+# InfraLap MultiWiFi — UAT 0.9
 
 ## New in 0.6
 - Lists saved WLAN profiles discovered through the Windows Native Wi-Fi API.
@@ -65,3 +65,12 @@ Windows 11 x64 UAT build. Not a bandwidth-bonding client.
 - Connection 1 can be pre-populated from the current connected SSID on initial scan; Connection 2 remains independently selectable.
 - The saved-profile "Use in Connection 1/2" actions now select the matching SSID from the scanned dropdown when it is visible, or enter the saved SSID as text when it is not currently visible.
 - The existing scan output panel remains available for detailed netsh scan diagnostics.
+
+
+## New in 0.9 — SSID dropdown readability
+- Increased contrast for SSID names in both scanned-network dropdowns.
+- Uses dark, readable SSID text on a white dropdown surface.
+- Network details (authentication, signal, channel and radio type) use a separate readable secondary text colour.
+- Added clear hover and selected-item backgrounds so users can identify the active choice.
+- Applies consistent high-contrast dropdown item styling to the adapter selectors as well.
+- No change to scan parsing, credentials, Windows profiles or Dual-STA connection behaviour.

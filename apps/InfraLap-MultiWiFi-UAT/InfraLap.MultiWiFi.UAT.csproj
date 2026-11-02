@@ -8,7 +8,7 @@
     <PlatformTarget>x64</PlatformTarget>
     <AssemblyName>InfraLap.MultiWiFi</AssemblyName>
     <RootNamespace>InfraLap.MultiWiFi</RootNamespace>
-    <Version>0.8.0</Version>
+    <Version>0.9.0</Version>
     <Company>InfraLap Solutions</Company>
     <Product>InfraLap MultiWiFi</Product>
   </PropertyGroup>
