@@ -35,10 +35,10 @@ jobs:
           $PSVersionTable
 
       - name: Restore
-        run: dotnet restore apps/InfraLap-MultiWiFi-UAT/InfraLap.MultiWiFi.UAT.csproj
+        run: dotnet restore apps/InfraLap-MultiWiFi-UAT/InfraLap.MultiWiFi.UAT.csproj --runtime win-x64
 
       - name: Build
-        run: dotnet build apps/InfraLap-MultiWiFi-UAT/InfraLap.MultiWiFi.UAT.csproj --configuration Release --no-restore
+        run: dotnet build apps/InfraLap-MultiWiFi-UAT/InfraLap.MultiWiFi.UAT.csproj --configuration Release --runtime win-x64 --no-restore
 
       - name: Publish self-contained x64 app
         run: dotnet publish apps/InfraLap-MultiWiFi-UAT/InfraLap.MultiWiFi.UAT.csproj --configuration Release --runtime win-x64 --self-contained true --no-restore -p:PublishSingleFile=false -o publish/win-x64
