@@ -1,61 +1,198 @@
 <Window x:Class="InfraLap.MultiWiFi.MainWindow"
- xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
- xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- Title="InfraLap MultiWiFi" Height="760" Width="1120" MinHeight="640" MinWidth="900"
- Background="#101827" WindowStartupLocation="CenterScreen">
- <Window.Resources>
-  <Style TargetType="TextBlock"><Setter Property="Foreground" Value="#F3F6FC"/><Setter Property="FontFamily" Value="Segoe UI"/></Style>
-  <Style TargetType="Button"><Setter Property="Background" Value="#5B91FF"/><Setter Property="Foreground" Value="White"/><Setter Property="Padding" Value="14,8"/><Setter Property="Margin" Value="0,0,8,8"/><Setter Property="BorderThickness" Value="0"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
-  <Style TargetType="TextBox"><Setter Property="Background" Value="#24344E"/><Setter Property="Foreground" Value="White"/><Setter Property="BorderBrush" Value="#405474"/><Setter Property="Padding" Value="8"/></Style>
- </Window.Resources>
- <Grid Margin="24">
-  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-  <DockPanel Grid.Row="0" Margin="0,0,0,18">
-   <StackPanel>
-    <TextBlock Text="INFRALAP SOLUTIONS" Foreground="#78A7FF" FontSize="12" FontWeight="Bold"/>
-    <TextBlock Text="MultiWiFi Manager" FontSize="28" FontWeight="Bold" Margin="0,3,0,0"/>
-    <TextBlock Text="Phase A hardware discovery and saved-profile connection UAT" Foreground="#A9B7CC" FontSize="12"/>
-   </StackPanel>
-   <Border DockPanel.Dock="Right" Background="#173B34" CornerRadius="10" Padding="12,7" VerticalAlignment="Center">
-    <TextBlock Text="UAT BUILD 0.4" Foreground="#83E0B7" FontSize="11" FontWeight="Bold"/>
-   </Border>
-  </DockPanel>
-  <WrapPanel Grid.Row="1" Margin="0,0,0,12">
-   <Button Content="Refresh Wi-Fi" Click="Refresh_Click"/>
-   <Button Content="Show Drivers" Click="Drivers_Click" Background="#34445F"/>
-   <Button Content="Connect saved profile" Click="Connect_Click"/>
-   <Button Content="Disconnect" Click="Disconnect_Click" Background="#A94B55"/>
-   <Button Content="Export diagnostics" Click="Export_Click" Background="#34445F"/>
-  </WrapPanel>
-  <Grid Grid.Row="2">
-   <Grid.ColumnDefinitions><ColumnDefinition Width="1.1*"/><ColumnDefinition Width="1.4*"/></Grid.ColumnDefinitions>
-   <Border Grid.Column="0" Background="#1B2940" CornerRadius="12" Padding="16" Margin="0,0,12,0">
-    <DockPanel>
-     <TextBlock DockPanel.Dock="Top" Text="NETWORK INTERFACES" FontWeight="Bold" Foreground="#A9B7CC" Margin="0,0,0,10"/>
-     <ListBox x:Name="InterfacesList" Background="#172338" Foreground="White" BorderThickness="0" SelectionChanged="InterfacesList_SelectionChanged"/>
-     <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
-      <TextBlock Text="Saved Wi-Fi profile name" Foreground="#A9B7CC" FontSize="12" Margin="0,0,0,5"/>
-      <TextBox x:Name="ProfileNameBox" Text=""/>
-      <TextBlock Text="Selected interface" Foreground="#A9B7CC" FontSize="12" Margin="0,10,0,5"/>
-      <TextBox x:Name="InterfaceNameBox" IsReadOnly="True"/>
-      <TextBlock Text="Connection uses a profile already saved in Windows. This prototype does not collect or store Wi-Fi passwords."
-       Foreground="#A9B7CC" FontSize="11" TextWrapping="Wrap" Margin="0,10,0,0"/>
-     </StackPanel>
-    </DockPanel>
-   </Border>
-   <Border Grid.Column="1" Background="#1B2940" CornerRadius="12" Padding="16">
-    <DockPanel>
-     <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
-      <TextBlock Text="AVAILABLE WI-FI NETWORKS" FontWeight="Bold" FontSize="15"/>
-      <TextBlock Text="Detected SSIDs and signal information from Windows WLAN scan" Foreground="#A9B7CC" FontSize="11" Margin="0,4,0,0"/>
-     </StackPanel>
-     <TextBox x:Name="NetworksOutput" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
-      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12"/>
-    </DockPanel>
-   </Border>
-  </Grid>
-  <Border Grid.Row="3" Background="#172338" CornerRadius="8" Padding="11" Margin="0,12,0,0">
-   <TextBlock x:Name="StatusText" Text="Ready. Select Refresh Wi-Fi to scan." Foreground="#A9B7CC" FontSize="12"/>
-  </Border>
- </Grid>
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="InfraLap MultiWiFi" Height="850" Width="1280"
+        MinHeight="760" MinWidth="1100"
+        Background="#101827" WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <SolidColorBrush x:Key="PanelBrush" Color="#1B2940"/>
+        <SolidColorBrush x:Key="InputBrush" Color="#24344E"/>
+        <SolidColorBrush x:Key="MutedBrush" Color="#A9B7CC"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="#5B91FF"/>
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#F3F6FC"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="15,9"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="{StaticResource InputBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#405474"/>
+            <Setter Property="Padding" Value="9,7"/>
+            <Setter Property="CaretBrush" Value="White"/>
+        </Style>
+        <Style TargetType="PasswordBox">
+            <Setter Property="Background" Value="{StaticResource InputBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#405474"/>
+            <Setter Property="Padding" Value="9,7"/>
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="{StaticResource InputBrush}"/>
+            <Setter Property="Foreground" Value="#172338"/>
+            <Setter Property="BorderBrush" Value="#405474"/>
+            <Setter Property="Padding" Value="7,5"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0" Margin="0,0,0,18">
+            <StackPanel>
+                <TextBlock Text="INFRALAP SOLUTIONS" FontSize="12" FontWeight="Bold" Foreground="#78A7FF"/>
+                <TextBlock Text="MultiWiFi Manager" FontSize="29" FontWeight="Bold" Margin="0,3,0,0"/>
+                <TextBlock Text="Two independent Wi-Fi profiles · Separate SSIDs and passwords · Windows 11 x64"
+                           Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,4,0,0"/>
+            </StackPanel>
+            <Border DockPanel.Dock="Right" Background="#173B34" CornerRadius="10" Padding="12,8" VerticalAlignment="Center">
+                <TextBlock Text="PHASE A · TWO-PROFILE UAT" Foreground="#83E0B7" FontSize="11" FontWeight="Bold"/>
+            </Border>
+        </DockPanel>
+
+        <WrapPanel Grid.Row="1" Margin="0,0,0,16">
+            <Button Content="Refresh Wi-Fi adapters" Click="Refresh_Click"/>
+            <Button Content="Scan nearby networks" Click="Scan_Click" Background="#34445F"/>
+            <Button Content="Export diagnostics" Click="Export_Click" Background="#34445F" Margin="0"/>
+        </WrapPanel>
+
+        <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="150"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Row="0" Grid.Column="0" Background="{StaticResource PanelBrush}" CornerRadius="14"
+                    Padding="18" Margin="0,0,10,14">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" Margin="0,0,0,17">
+                        <StackPanel>
+                            <TextBlock Text="CONNECTION 1" Foreground="#78A7FF" FontSize="11" FontWeight="Bold"/>
+                            <TextBlock Text="Primary Wi-Fi profile" FontSize="19" FontWeight="Bold" Margin="0,3,0,0"/>
+                        </StackPanel>
+                        <Border DockPanel.Dock="Right" Background="#263A5A" CornerRadius="8" Padding="10,5" VerticalAlignment="Center">
+                            <TextBlock Text="PROFILE 01" Foreground="#BDD2FF" FontSize="10" FontWeight="Bold"/>
+                        </Border>
+                    </DockPanel>
+                    <StackPanel Grid.Row="1" Margin="0,0,0,12">
+                        <TextBlock Text="Wi-Fi adapter" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,5"/>
+                        <ComboBox x:Name="Connection1Adapter" Height="36" DisplayMemberPath="DisplayText"/>
+                    </StackPanel>
+                    <StackPanel Grid.Row="2" Margin="0,0,0,12">
+                        <TextBlock Text="Network name (SSID)" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,5"/>
+                        <TextBox x:Name="Connection1Ssid" Height="37" ToolTip="Enter the exact Wi-Fi network name"/>
+                    </StackPanel>
+                    <StackPanel Grid.Row="3" Margin="0,0,0,12">
+                        <TextBlock Text="Wi-Fi password" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,5"/>
+                        <PasswordBox x:Name="Connection1Password" Height="37"/>
+                    </StackPanel>
+                    <WrapPanel Grid.Row="4" Margin="0,0,0,12">
+                        <Button Content="Connect 1" Click="Connect1_Click"/>
+                        <Button Content="Disconnect 1" Click="Disconnect1_Click" Background="#A94B55" Margin="0"/>
+                    </WrapPanel>
+                    <Border Grid.Row="5" Background="#172338" CornerRadius="8" Padding="11">
+                        <StackPanel>
+                            <TextBlock Text="CONNECTION STATUS" Foreground="{StaticResource MutedBrush}" FontSize="10" FontWeight="Bold"/>
+                            <TextBlock x:Name="Connection1Status" Text="Not connected" FontSize="12" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Grid.Row="6" Text="Credentials are imported into the current Windows user Wi-Fi profile. InfraLap does not save them in its own settings."
+                               Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap" VerticalAlignment="Bottom" Margin="0,13,0,0"/>
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="0" Grid.Column="1" Background="{StaticResource PanelBrush}" CornerRadius="14"
+                    Padding="18" Margin="10,0,0,14">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" Margin="0,0,0,17">
+                        <StackPanel>
+                            <TextBlock Text="CONNECTION 2" Foreground="#83DDB5" FontSize="11" FontWeight="Bold"/>
+                            <TextBlock Text="Secondary Wi-Fi profile" FontSize="19" FontWeight="Bold" Margin="0,3,0,0"/>
+                        </StackPanel>
+                        <Border DockPanel.Dock="Right" Background="#173B34" CornerRadius="8" Padding="10,5" VerticalAlignment="Center">
+                            <TextBlock Text="PROFILE 02" Foreground="#A9F0D1" FontSize="10" FontWeight="Bold"/>
+                        </Border>
+                    </DockPanel>
+                    <StackPanel Grid.Row="1" Margin="0,0,0,12">
+                        <TextBlock Text="Wi-Fi adapter" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,5"/>
+                        <ComboBox x:Name="Connection2Adapter" Height="36" DisplayMemberPath="DisplayText"/>
+                    </StackPanel>
+                    <StackPanel Grid.Row="2" Margin="0,0,0,12">
+                        <TextBlock Text="Network name (SSID)" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,5"/>
+                        <TextBox x:Name="Connection2Ssid" Height="37" ToolTip="Enter the exact second Wi-Fi network name"/>
+                    </StackPanel>
+                    <StackPanel Grid.Row="3" Margin="0,0,0,12">
+                        <TextBlock Text="Wi-Fi password" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,5"/>
+                        <PasswordBox x:Name="Connection2Password" Height="37"/>
+                    </StackPanel>
+                    <WrapPanel Grid.Row="4" Margin="0,0,0,12">
+                        <Button Content="Connect 2" Click="Connect2_Click"/>
+                        <Button Content="Disconnect 2" Click="Disconnect2_Click" Background="#A94B55" Margin="0"/>
+                    </WrapPanel>
+                    <Border Grid.Row="5" Background="#172338" CornerRadius="8" Padding="11">
+                        <StackPanel>
+                            <TextBlock Text="CONNECTION STATUS" Foreground="{StaticResource MutedBrush}" FontSize="10" FontWeight="Bold"/>
+                            <TextBlock x:Name="Connection2Status" Text="Not connected" FontSize="12" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Grid.Row="6" Text="For two active links in this UAT build, assign a different physical Wi-Fi adapter to each profile."
+                               Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap" VerticalAlignment="Bottom" Margin="0,13,0,0"/>
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="1" Grid.Column="0" Background="#172338" CornerRadius="10" Padding="12" Margin="0,0,10,0">
+                <StackPanel>
+                    <TextBlock Text="HARDWARE READINESS" Foreground="{StaticResource MutedBrush}" FontSize="10" FontWeight="Bold"/>
+                    <TextBlock x:Name="HardwareStatus" Text="Checking wireless adapters..." FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Row="1" Grid.Column="1" Background="#172338" CornerRadius="10" Padding="12" Margin="10,0,0,0">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="NEARBY WI-FI NETWORKS" Foreground="{StaticResource MutedBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,6"/>
+                    <TextBox x:Name="NetworksOutput" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                             FontFamily="Consolas" FontSize="10" Background="#101827" BorderThickness="0"/>
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="3" Background="#172338" CornerRadius="8" Padding="11" Margin="0,14,0,0">
+            <TextBlock x:Name="StatusText" Text="Ready. Refresh Wi-Fi adapters to begin." Foreground="{StaticResource MutedBrush}" FontSize="12"/>
+        </Border>
+    </Grid>
 </Window>
