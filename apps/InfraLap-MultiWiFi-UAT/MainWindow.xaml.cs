@@ -217,7 +217,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var adapter = _interfaces.FirstOrDefault(x => x.Name.Equals(profile.AdapterName, StringComparison.OrdinalIgnoreCase));
+        var adapter = _interfaces.FirstOrDefault(x => x.Description.Equals(profile.AdapterName, StringComparison.OrdinalIgnoreCase));
         if (slot == 1)
         {
             Connection1Ssid.Text = profile.Ssid;
