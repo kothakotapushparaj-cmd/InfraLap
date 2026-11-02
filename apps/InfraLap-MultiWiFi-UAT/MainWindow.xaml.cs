@@ -33,7 +33,14 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         Loaded += async (_, _) => await RefreshAllAsync();
-        Closed += (_, _) => { Connection1Password.Clear(); Connection2Password.Clear(); SavedPasswordHidden.Clear(); SavedPasswordVisible.Clear(); };
+        Closed += (_, _) =>
+        {
+            Connection1Password.Clear();
+            Connection2Password.Clear();
+            SavedPasswordHidden.Clear();
+            SavedPasswordVisible.Clear();
+            NativeWifiService.ReleaseDualSta();
+        };
     }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e) => await RefreshAllAsync();
@@ -45,6 +52,13 @@ public partial class MainWindow : Window
     private void UseSavedForConnection2_Click(object sender, RoutedEventArgs e) => UseSavedProfile(2);
     private async void Connect1_Click(object sender, RoutedEventArgs e) => await ConnectProfileAsync(1);
     private async void Connect2_Click(object sender, RoutedEventArgs e) => await ConnectProfileAsync(2);
+    private async void TrySecondarySta_Click(object sender, RoutedEventArgs e) => await TrySecondaryStaConnectionAsync();
+    private void StopSecondarySta_Click(object sender, RoutedEventArgs e)
+    {
+        var result = NativeWifiService.ReleaseDualSta();
+        SetProfileStatus(2, result, "#F0B36A");
+        StatusText.Text = "Secondary STA request released.";
+    }
     private async void Disconnect1_Click(object sender, RoutedEventArgs e) => await DisconnectProfileAsync(1);
     private async void Disconnect2_Click(object sender, RoutedEventArgs e) => await DisconnectProfileAsync(2);
 
@@ -269,6 +283,77 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             SavedPasswordStatus.Text = "Could not restart as Administrator: " + ex.Message;
+        }
+    }
+
+    private async Task TrySecondaryStaConnectionAsync()
+    {
+        var primaryAdapter = Connection1Adapter.SelectedItem as WifiInterface;
+        var secondaryAdapter = Connection2Adapter.SelectedItem as WifiInterface;
+        var ssid = Connection2Ssid.Text.Trim();
+        var password = Connection2Password.Password;
+
+        if (primaryAdapter is null || secondaryAdapter is null)
+        {
+            SetProfileStatus(2, "Select the same built-in Wi-Fi adapter in both cards.", "#F0B36A");
+            return;
+        }
+        if (!string.Equals(primaryAdapter.Name, secondaryAdapter.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            SetProfileStatus(2, "Select the same physical adapter in Connection 1 and Connection 2 for this experiment.", "#F0B36A");
+            return;
+        }
+        if (!string.Equals(primaryAdapter.State, "connected", StringComparison.OrdinalIgnoreCase))
+        {
+            SetProfileStatus(2, "Connect Connection 1 first. Windows starts secondary STA connectivity after the primary connection succeeds.", "#F0B36A");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(ssid) || Encoding.UTF8.GetByteCount(ssid) > 32)
+        {
+            SetProfileStatus(2, "Enter a valid second SSID (maximum 32 UTF-8 bytes).", "#F0B36A");
+            return;
+        }
+        if (password.Length < 8 || password.Length > 63)
+        {
+            SetProfileStatus(2, "For this WPA2-Personal experiment, enter a password from 8 to 63 characters.", "#F0B36A");
+            return;
+        }
+        if (string.Equals(primaryAdapter.Ssid, ssid, StringComparison.Ordinal))
+        {
+            SetProfileStatus(2, "Choose a different SSID. This experiment is checking two different networks.", "#F0B36A");
+            return;
+        }
+
+        try
+        {
+            SetProfileStatus(2, "Requesting secondary STA and submitting the second profile...", "#BDD2FF");
+            StatusText.Text = "Experimental Dual-STA test: InfraLap will not deliberately disconnect the primary Wi-Fi link.";
+            var attempt = await Task.Run(() =>
+                NativeWifiService.TryConnectSecondarySta(primaryAdapter.Description, ssid, password));
+            Connection2Password.Clear();
+            SetProfileStatus(2, attempt.Message, "#F0B36A");
+
+            await Task.Delay(6000);
+            var verification = await Task.Run(() => NativeWifiService.VerifySecondaryStaConnection(ssid));
+            if (verification.IsIndependentConnection)
+            {
+                SetProfileStatus(2,
+                    "VERIFIED: secondary interface is on '" + verification.SecondarySsid
+                    + "' while primary remains on '" + verification.PrimarySsid + "'.", "#83DDB5");
+                StatusText.Text = "Two different SSIDs were verified on primary and secondary STA interfaces.";
+            }
+            else
+            {
+                SetProfileStatus(2, verification.Message, "#F0B36A");
+                StatusText.Text = "The experimental request did not verify two different connected SSIDs.";
+            }
+        }
+        catch (Exception ex)
+        {
+            SetProfileStatus(2, "Experimental secondary connection failed: " + ex.Message, "#FF9292");
+            StatusText.Text = "Windows or the Wi-Fi driver rejected the secondary-interface attempt.";
+            MessageBox.Show(ex.Message, "InfraLap MultiWiFi — Experimental Dual-STA",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

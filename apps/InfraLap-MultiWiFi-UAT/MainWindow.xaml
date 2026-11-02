@@ -164,7 +164,10 @@
                     </StackPanel>
                     <WrapPanel Grid.Row="4" Margin="0,0,0,12">
                         <Button Content="Connect 2" Click="Connect2_Click"/>
-                        <Button Content="Disconnect 2" Click="Disconnect2_Click" Background="#A94B55" Margin="0"/>
+                        <Button Content="Try same-adapter SSID (experimental)" Click="TrySecondarySta_Click"
+                                Background="#8B6E30"/>
+                        <Button Content="Stop secondary STA" Click="StopSecondarySta_Click"
+                                Background="#A94B55" Margin="0"/>
                     </WrapPanel>
                     <Border Grid.Row="5" Background="#172338" CornerRadius="8" Padding="11">
                         <StackPanel>
@@ -172,7 +175,7 @@
                             <TextBlock x:Name="Connection2Status" Text="Not connected" FontSize="12" TextWrapping="Wrap" Margin="0,5,0,0"/>
                         </StackPanel>
                     </Border>
-                    <TextBlock Grid.Row="6" Text="Single-adapter secondary STA availability depends on the Wi-Fi chipset, firmware and driver. See Hardware Readiness below."
+                    <TextBlock Grid.Row="6" Text="Experimental: attempts WlanConnect on the driver-exposed secondary STA. Windows normally synchronizes this link with the primary; only a verified different SSID counts as success."
                                Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap" VerticalAlignment="Bottom" Margin="0,13,0,0"/>
                 </Grid>
             </Border>
