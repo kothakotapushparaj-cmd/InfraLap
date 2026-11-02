@@ -64,6 +64,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: InfraLap-MultiWiFi-Setup-x64
-          path: installer-output/InfraLap-MultiWiFi-Setup-x64-v0.6.exe
+          path: installer-output/InfraLap-MultiWiFi-Setup-x64-v0.7.exe
           if-no-files-found: error
           retention-days: 14
