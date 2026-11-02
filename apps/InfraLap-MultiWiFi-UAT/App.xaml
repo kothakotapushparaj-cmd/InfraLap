@@ -1,0 +1,10 @@
+<Application x:Class="InfraLap.MultiWiFi.App"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ StartupUri="MainWindow.xaml">
+ <Application.Resources>
+  <SolidColorBrush x:Key="AppBackground" Color="#101827"/>
+  <SolidColorBrush x:Key="PanelBackground" Color="#1B2940"/>
+  <SolidColorBrush x:Key="Accent" Color="#5B91FF"/>
+ </Application.Resources>
+</Application>
