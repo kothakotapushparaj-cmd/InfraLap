@@ -59,7 +59,7 @@
                            Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,4,0,0"/>
             </StackPanel>
             <Border DockPanel.Dock="Right" Background="#173B34" CornerRadius="10" Padding="12,8" VerticalAlignment="Center">
-                <TextBlock Text="V0.6 · PROFILE + DUAL-STA UAT" Foreground="#83E0B7" FontSize="11" FontWeight="Bold"/>
+                <TextBlock Text="V0.7 · EXPERIMENTAL SECONDARY-STA UAT" Foreground="#83E0B7" FontSize="11" FontWeight="Bold"/>
             </Border>
         </DockPanel>
 

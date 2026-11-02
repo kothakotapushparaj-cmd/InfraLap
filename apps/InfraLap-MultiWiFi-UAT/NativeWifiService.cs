@@ -33,8 +33,8 @@ internal static class NativeWifiService
         public WlanConnectionMode ConnectionMode;
         [MarshalAs(UnmanagedType.LPWStr)] public string ProfileName;
         public IntPtr Dot11Ssid;
-        public int Dot11BssType;
         public IntPtr DesiredBssidList;
+        public int Dot11BssType;
         public uint Flags;
     }
 

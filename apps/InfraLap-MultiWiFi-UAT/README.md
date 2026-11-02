@@ -1,4 +1,4 @@
-# InfraLap MultiWiFi — UAT 0.6
+# InfraLap MultiWiFi — UAT 0.7
 
 ## New in 0.6
 - Lists saved WLAN profiles discovered through the Windows Native Wi-Fi API.
@@ -42,3 +42,15 @@ The connection cards currently create WPA2-Personal (WPA2-PSK/AES) profiles and 
 8. Export diagnostics and verify no passwords are present.
 
 Windows 11 x64 UAT build. Not a bandwidth-bonding client.
+
+
+## Experimental single-adapter second-SSID attempt in 0.7
+- Select the same physical Wi-Fi adapter in Connection 1 and Connection 2.
+- Connect Connection 1 first, then enter a different WPA2-Personal SSID and password in Connection 2.
+- Press "Try same-adapter SSID (experimental)".
+- The app queries the secondary STA GUID, requests secondary connectivity, installs a WPA2 profile on that GUID with WlanSetProfile, and submits WlanConnect to that GUID.
+- It keeps its WLAN client handle open while the secondary STA session is active, as required by the Windows API. Use "Stop secondary STA" or close InfraLap to release the request.
+- After the request is accepted, the app queries the primary and secondary current-connection SSIDs. It reports success only if both interfaces are connected, the SSIDs differ, and the secondary SSID matches the requested SSID.
+- Windows may reject WlanSetProfile/WlanConnect on the secondary interface, or the driver may automatically synchronize it to the primary SSID. The app reports the observed result instead of claiming success.
+- This is experimental. Microsoft's documented Windows Dual-STA behavior is driver-managed and synchronized; arbitrary independent SSID selection is not guaranteed.
+
