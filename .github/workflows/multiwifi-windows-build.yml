@@ -1,0 +1,69 @@
+name: InfraLap MultiWiFi Windows Installer
+
+on:
+  push:
+    branches:
+      - feature/multiwifi-windows-build
+    paths:
+      - "apps/InfraLap-MultiWiFi-UAT/**"
+      - "installer/InfraLap-MultiWiFi.iss"
+      - ".github/workflows/multiwifi-windows-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-x64:
+    name: Build Windows x64 installer
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Show toolchain
+        shell: pwsh
+        run: |
+          dotnet --info
+          $PSVersionTable
+
+      - name: Restore
+        run: dotnet restore apps/InfraLap-MultiWiFi-UAT/InfraLap.MultiWiFi.UAT.csproj
+
+      - name: Build
+        run: dotnet build apps/InfraLap-MultiWiFi-UAT/InfraLap.MultiWiFi.UAT.csproj --configuration Release --no-restore
+
+      - name: Publish self-contained x64 app
+        run: dotnet publish apps/InfraLap-MultiWiFi-UAT/InfraLap.MultiWiFi.UAT.csproj --configuration Release --runtime win-x64 --self-contained true --no-restore -p:PublishSingleFile=false -o publish/win-x64
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress
+          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
+            throw "Inno Setup compiler was not found."
+          }
+
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer/InfraLap-MultiWiFi.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+          $installer = "installer-output/InfraLap-MultiWiFi-Setup-x64.exe"
+          if (-not (Test-Path $installer)) { throw "Installer EXE was not generated." }
+          Get-Item $installer | Format-List FullName,Length,LastWriteTime
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: InfraLap-MultiWiFi-Setup-x64
+          path: installer-output/InfraLap-MultiWiFi-Setup-x64.exe
+          if-no-files-found: error
+          retention-days: 14
