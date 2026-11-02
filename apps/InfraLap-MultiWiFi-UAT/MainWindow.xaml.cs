@@ -19,6 +19,31 @@ public partial class MainWindow : Window
             : $"{Name} — {Description} — {State}";
     }
 
+    private sealed class WifiNetwork
+    {
+        public string Ssid { get; init; } = "";
+        public string Authentication { get; set; } = "";
+        public string Encryption { get; set; } = "";
+        public int SignalPercent { get; set; } = -1;
+        public string RadioType { get; set; } = "";
+        public int Channel { get; set; } = -1;
+
+        public string DetailText
+        {
+            get
+            {
+                var parts = new List<string>();
+                if (!string.IsNullOrWhiteSpace(Authentication)) parts.Add(Authentication);
+                if (SignalPercent >= 0) parts.Add(SignalPercent + "% signal");
+                if (Channel >= 0) parts.Add("Channel " + Channel);
+                if (!string.IsNullOrWhiteSpace(RadioType)) parts.Add(RadioType);
+                return parts.Count == 0 ? "Security or signal details unavailable" : string.Join(" · ", parts);
+            }
+        }
+
+        public override string ToString() => Ssid;
+    }
+
     private sealed record NetshResult(int ExitCode, string StandardOutput, string StandardError)
     {
         public string CombinedOutput => string.Join(Environment.NewLine,
@@ -26,6 +51,7 @@ public partial class MainWindow : Window
     }
 
     private List<WifiInterface> _interfaces = new();
+    private List<WifiNetwork> _scannedNetworks = new();
     private List<SavedWifiProfile> _savedProfiles = new();
     private SavedWifiProfile? _selectedSavedProfile;
 
@@ -105,17 +131,125 @@ public partial class MainWindow : Window
     {
         try
         {
+            var previousSsid1 = GetSsid(1);
+            var previousSsid2 = GetSsid(2);
+            if (string.IsNullOrWhiteSpace(previousSsid1))
+                previousSsid1 = (Connection1Adapter.SelectedItem as WifiInterface)?.Ssid ?? "";
+
             if (showStatus) StatusText.Text = "Scanning nearby Wi-Fi networks...";
             var result = await Task.Run(() => RunNetsh("wlan", "show", "networks", "mode=bssid"));
             EnsureNetshSuccess(result, "Scan nearby networks");
+
             NetworksOutput.Text = result.StandardOutput;
-            if (showStatus) StatusText.Text = "Nearby Wi-Fi scan completed.";
+            _scannedNetworks = ParseScannedNetworks(result.StandardOutput);
+
+            Connection1Ssid.ItemsSource = _scannedNetworks;
+            Connection2Ssid.ItemsSource = _scannedNetworks;
+            SetSsid(1, previousSsid1);
+            SetSsid(2, previousSsid2);
+
+            if (showStatus)
+                StatusText.Text = "Scan complete: " + _scannedNetworks.Count
+                    + " unique network(s) found. Select a network from either SSID dropdown.";
         }
         catch (Exception ex)
         {
             NetworksOutput.Text = ex.Message;
             if (showStatus) StatusText.Text = "Wi-Fi scan failed: " + ex.Message;
         }
+    }
+
+    private string GetSsid(int slot)
+    {
+        var combo = slot == 1 ? Connection1Ssid : Connection2Ssid;
+        return combo.SelectedItem is WifiNetwork selected
+            ? selected.Ssid
+            : combo.Text.Trim();
+    }
+
+    private void SetSsid(int slot, string? ssid)
+    {
+        var combo = slot == 1 ? Connection1Ssid : Connection2Ssid;
+        if (string.IsNullOrWhiteSpace(ssid))
+        {
+            combo.SelectedItem = null;
+            combo.Text = "";
+            return;
+        }
+
+        var match = _scannedNetworks.FirstOrDefault(n =>
+            string.Equals(n.Ssid, ssid, StringComparison.Ordinal));
+        if (match is not null)
+        {
+            combo.SelectedItem = match;
+        }
+        else
+        {
+            combo.SelectedItem = null;
+            combo.Text = ssid;
+        }
+    }
+
+    private static List<WifiNetwork> ParseScannedNetworks(string output)
+    {
+        var networks = new Dictionary<string, WifiNetwork>(StringComparer.Ordinal);
+        WifiNetwork? current = null;
+
+        foreach (var raw in output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
+        {
+            var line = raw.Trim();
+            var separator = line.IndexOf(':');
+            if (separator < 0) continue;
+
+            var key = line[..separator].Trim();
+            var value = line[(separator + 1)..].Trim();
+
+            if (key.StartsWith("SSID", StringComparison.OrdinalIgnoreCase)
+                && key.Length > 4
+                && char.IsDigit(key.Skip(4).FirstOrDefault(c => !char.IsWhiteSpace(c))))
+            {
+                current = null;
+                if (string.IsNullOrWhiteSpace(value)) continue;
+
+                if (!networks.TryGetValue(value, out current))
+                {
+                    current = new WifiNetwork { Ssid = value };
+                    networks.Add(value, current);
+                }
+                continue;
+            }
+
+            if (current is null) continue;
+
+            if (key.Equals("Authentication", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(current.Authentication)) current.Authentication = value;
+            }
+            else if (key.Equals("Encryption", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(current.Encryption)) current.Encryption = value;
+            }
+            else if (key.Equals("Signal", StringComparison.OrdinalIgnoreCase))
+            {
+                var numeric = value.Trim().TrimEnd('%');
+                if (int.TryParse(numeric, out var signal))
+                    current.SignalPercent = Math.Max(current.SignalPercent, signal);
+            }
+            else if (key.Equals("Radio type", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(current.RadioType)) current.RadioType = value;
+            }
+            else if (key.Equals("Channel", StringComparison.OrdinalIgnoreCase))
+            {
+                if (int.TryParse(value, out var channel) && current.Channel < 0)
+                    current.Channel = channel;
+            }
+        }
+
+        return networks.Values
+            .OrderByDescending(n => n.SignalPercent)
+            .ThenBy(n => n.Ssid, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private async Task RefreshSavedProfilesAsync(bool showStatus = true)
@@ -234,13 +368,13 @@ public partial class MainWindow : Window
         var adapter = _interfaces.FirstOrDefault(x => x.Description.Equals(profile.AdapterName, StringComparison.OrdinalIgnoreCase));
         if (slot == 1)
         {
-            Connection1Ssid.Text = profile.Ssid;
+            SetSsid(1, profile.Ssid);
             Connection1Password.Password = profile.Password;
             if (adapter is not null) Connection1Adapter.SelectedItem = adapter;
         }
         else
         {
-            Connection2Ssid.Text = profile.Ssid;
+            SetSsid(2, profile.Ssid);
             Connection2Password.Password = profile.Password;
             if (adapter is not null) Connection2Adapter.SelectedItem = adapter;
         }
@@ -290,7 +424,7 @@ public partial class MainWindow : Window
     {
         var primaryAdapter = Connection1Adapter.SelectedItem as WifiInterface;
         var secondaryAdapter = Connection2Adapter.SelectedItem as WifiInterface;
-        var ssid = Connection2Ssid.Text.Trim();
+        var ssid = GetSsid(2);
         var password = Connection2Password.Password;
 
         if (primaryAdapter is null || secondaryAdapter is null)
@@ -362,12 +496,12 @@ public partial class MainWindow : Window
         var adapter = slot == 1
             ? Connection1Adapter.SelectedItem as WifiInterface
             : Connection2Adapter.SelectedItem as WifiInterface;
-        var ssid = (slot == 1 ? Connection1Ssid.Text : Connection2Ssid.Text).Trim();
+        var ssid = GetSsid(slot);
         var password = slot == 1 ? Connection1Password.Password : Connection2Password.Password;
         var otherAdapter = slot == 1
             ? Connection2Adapter.SelectedItem as WifiInterface
             : Connection1Adapter.SelectedItem as WifiInterface;
-        var otherSsid = (slot == 1 ? Connection2Ssid.Text : Connection1Ssid.Text).Trim();
+        var otherSsid = GetSsid(slot == 1 ? 2 : 1);
 
         if (adapter is null)
         {
@@ -571,7 +705,7 @@ public partial class MainWindow : Window
         var adapter = slot == 1
             ? Connection1Adapter.SelectedItem as WifiInterface
             : Connection2Adapter.SelectedItem as WifiInterface;
-        var targetSsid = (slot == 1 ? Connection1Ssid.Text : Connection2Ssid.Text).Trim();
+        var targetSsid = GetSsid(slot);
 
         if (adapter is null)
         {

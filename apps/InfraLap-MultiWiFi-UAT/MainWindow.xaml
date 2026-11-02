@@ -59,7 +59,7 @@
                            Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,4,0,0"/>
             </StackPanel>
             <Border DockPanel.Dock="Right" Background="#173B34" CornerRadius="10" Padding="12,8" VerticalAlignment="Center">
-                <TextBlock Text="V0.7 · EXPERIMENTAL SECONDARY-STA UAT" Foreground="#83E0B7" FontSize="11" FontWeight="Bold"/>
+                <TextBlock Text="V0.8 · SCAN-TO-SELECT SSID UAT" Foreground="#83E0B7" FontSize="11" FontWeight="Bold"/>
             </Border>
         </DockPanel>
 
@@ -107,8 +107,20 @@
                         <ComboBox x:Name="Connection1Adapter" Height="36" DisplayMemberPath="DisplayText"/>
                     </StackPanel>
                     <StackPanel Grid.Row="2" Margin="0,0,0,12">
-                        <TextBlock Text="Network name (SSID)" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,5"/>
-                        <TextBox x:Name="Connection1Ssid" Height="37" ToolTip="Enter the exact Wi-Fi network name"/>
+                        <TextBlock Text="Choose nearby network (SSID)" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,5"/>
+                        <ComboBox x:Name="Connection1Ssid" Height="37" IsEditable="True"
+                                  IsTextSearchEnabled="True" TextSearch.TextPath="Ssid"
+                                  StaysOpenOnEdit="False"
+                                  ToolTip="Select a scanned network from the list, or type a hidden SSID manually">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="3,2">
+                                        <TextBlock Text="{Binding Ssid}" Foreground="#F3F6FC" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding DetailText}" Foreground="#A9B7CC" FontSize="10"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
                     </StackPanel>
                     <StackPanel Grid.Row="3" Margin="0,0,0,12">
                         <TextBlock Text="Wi-Fi password" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,5"/>
@@ -156,7 +168,19 @@
                     </StackPanel>
                     <StackPanel Grid.Row="2" Margin="0,0,0,12">
                         <TextBlock Text="Network name (SSID)" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,5"/>
-                        <TextBox x:Name="Connection2Ssid" Height="37" ToolTip="Enter the exact second Wi-Fi network name"/>
+                        <ComboBox x:Name="Connection2Ssid" Height="37" IsEditable="True"
+                                  IsTextSearchEnabled="True" TextSearch.TextPath="Ssid"
+                                  StaysOpenOnEdit="False"
+                                  ToolTip="Select a scanned network from the list, or type a hidden SSID manually">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="3,2">
+                                        <TextBlock Text="{Binding Ssid}" Foreground="#F3F6FC" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding DetailText}" Foreground="#A9B7CC" FontSize="10"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
                     </StackPanel>
                     <StackPanel Grid.Row="3" Margin="0,0,0,12">
                         <TextBlock Text="Wi-Fi password" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,5"/>
@@ -188,7 +212,7 @@
             </Border>
             <Border Grid.Row="1" Grid.Column="1" Background="#172338" CornerRadius="10" Padding="12" Margin="10,0,0,0">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="NEARBY WI-FI NETWORKS" Foreground="{StaticResource MutedBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,6"/>
+                    <TextBlock DockPanel.Dock="Top" Text="NEARBY WI-FI NETWORKS · SELECT FROM SSID DROPDOWN" Foreground="{StaticResource MutedBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,6"/>
                     <TextBox x:Name="NetworksOutput" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                              FontFamily="Consolas" FontSize="10" Background="#101827" BorderThickness="0"/>
