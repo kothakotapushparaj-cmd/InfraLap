@@ -349,7 +349,7 @@ public partial class MainWindow : Window
         var trafficTotals = new TextBlock
         {
             Text = "Received: collecting...  |  Sent: collecting...",
-            Foreground = BrushFrom("#E5EDF9"),
+            Foreground = MakeBrush("#E5EDF9"),
             FontSize = 10,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 5, 0, 0)
