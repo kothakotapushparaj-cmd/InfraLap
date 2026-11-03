@@ -7,6 +7,7 @@ on:
       - multiwifi-v1.2.1-build-clean
     paths:
       - 'MultiWiFi/InfraLap-MultiWiFi-v1.2.1-source.zip'
+      - 'MultiWiFi/InfraLap-MultiWiFi-v1.2.1-build-source.zip.b64'
 
 permissions:
   contents: read
@@ -22,7 +23,12 @@ jobs:
         shell: pwsh
         run: |
           $archive = Join-Path $env:GITHUB_WORKSPACE 'MultiWiFi/InfraLap-MultiWiFi-v1.2.1-source.zip'
-          if (!(Test-Path $archive)) { throw 'Source ZIP missing at MultiWiFi/InfraLap-MultiWiFi-v1.2.1-source.zip.' }
+          $encodedArchive = Join-Path $env:GITHUB_WORKSPACE 'MultiWiFi/InfraLap-MultiWiFi-v1.2.1-build-source.zip.b64'
+          if (!(Test-Path $archive) -and (Test-Path $encodedArchive)) {
+            $encoded = (Get-Content -Raw -Path $encodedArchive).Trim()
+            [IO.File]::WriteAllBytes($archive, [Convert]::FromBase64String($encoded))
+          }
+          if (!(Test-Path $archive)) { throw 'Source ZIP missing. Expected the source ZIP or its .b64 transport file in MultiWiFi/.' }
           $sourceRoot = Join-Path $env:RUNNER_TEMP 'infralap-multiwifi-source'
           New-Item -ItemType Directory -Force -Path $sourceRoot | Out-Null
           Expand-Archive -Path $archive -DestinationPath $sourceRoot -Force
