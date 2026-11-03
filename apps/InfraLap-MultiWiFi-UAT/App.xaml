@@ -3,8 +3,8 @@
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  StartupUri="MainWindow.xaml">
  <Application.Resources>
-  <SolidColorBrush x:Key="AppBackground" Color="#101827"/>
-  <SolidColorBrush x:Key="PanelBackground" Color="#1B2940"/>
-  <SolidColorBrush x:Key="Accent" Color="#5B91FF"/>
+  <SolidColorBrush x:Key="AppBackground" Color="#0A1020"/>
+  <SolidColorBrush x:Key="PanelBackground" Color="#111C2F"/>
+  <SolidColorBrush x:Key="Accent" Color="#5595FF"/>
  </Application.Resources>
 </Application>
