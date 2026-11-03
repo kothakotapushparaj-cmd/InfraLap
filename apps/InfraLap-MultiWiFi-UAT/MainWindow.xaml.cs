@@ -2,12 +2,14 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net.NetworkInformation;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using System.Xml.Linq;
 using Microsoft.Win32;
 
@@ -71,7 +73,13 @@ public partial class MainWindow : Window
         public TextBlock Status { get; set; } = null!;
         public TextBlock SignalLabel { get; set; } = null!;
         public ProgressBar SignalBar { get; set; } = null!;
+        public TextBlock TrafficTotalsText { get; set; } = null!;
+        public TextBlock TrafficRatesText { get; set; } = null!;
         public TextBlock IdentityDetails { get; set; } = null!;
+        public long LastBytesReceived { get; set; }
+        public long LastBytesSent { get; set; }
+        public DateTime LastTrafficSampleUtc { get; set; }
+        public bool HasTrafficSample { get; set; }
         public TextBox Nickname { get; set; } = null!;
         public ComboBox NetworkBox { get; set; } = null!;
         public PasswordBox PasswordBox { get; set; } = null!;
@@ -88,7 +96,10 @@ public partial class MainWindow : Window
     }
 
     private sealed record CardSnapshot(string Ssid, string Nickname);
+    private sealed record TrafficSample(string Id, string Name, string MacAddress, long BytesReceived, long BytesSent);
 
+    private readonly DispatcherTimer _trafficTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private bool _trafficPollBusy;
     private readonly List<WifiInterface> _interfaces = new();
     private readonly List<WifiNetwork> _scannedNetworks = new();
     private List<SavedWifiProfile> _savedProfiles = new();
@@ -106,9 +117,16 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         LoadAdapterLabels();
-        Loaded += async (_, _) => await RefreshAllAsync();
+        _trafficTimer.Tick += async (_, _) => await RefreshTrafficAsync();
+        Loaded += async (_, _) =>
+        {
+            await RefreshAllAsync();
+            await RefreshTrafficAsync();
+            _trafficTimer.Start();
+        };
         Closed += (_, _) =>
         {
+            _trafficTimer.Stop();
             foreach (var card in _adapterCards)
             {
                 card.PasswordBox.Clear();
@@ -311,6 +329,43 @@ public partial class MainWindow : Window
         signalPanel.Children.Add(signalBar);
         panel.Children.Add(signalPanel);
 
+        var trafficBorder = new Border
+        {
+            Background = MakeBrush("#0D1B2D"),
+            BorderBrush = MakeBrush("#29445F"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(7),
+            Padding = new Thickness(10),
+            Margin = new Thickness(0, 0, 0, 9)
+        };
+        var trafficStack = new StackPanel();
+        trafficStack.Children.Add(new TextBlock
+        {
+            Text = "ADAPTER DATA TRANSFER",
+            Foreground = MutedBrush,
+            FontSize = 8,
+            FontWeight = FontWeights.Bold
+        });
+        var trafficTotals = new TextBlock
+        {
+            Text = "Received: collecting...  |  Sent: collecting...",
+            Foreground = BrushFrom("#E5EDF9"),
+            FontSize = 10,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 5, 0, 0)
+        };
+        var trafficRates = new TextBlock
+        {
+            Text = "Live rate: calculating first sample...",
+            Foreground = MutedBrush,
+            FontSize = 9,
+            Margin = new Thickness(0, 3, 0, 0)
+        };
+        trafficStack.Children.Add(trafficTotals);
+        trafficStack.Children.Add(trafficRates);
+        trafficBorder.Child = trafficStack;
+        panel.Children.Add(trafficBorder);
+
         var statusBorder = new Border
         {
             Background = MakeBrush("#0B1728"), BorderBrush = MakeBrush("#293D59"),
@@ -345,6 +400,8 @@ public partial class MainWindow : Window
         card.Status = status;
         card.SignalLabel = signalLabel;
         card.SignalBar = signalBar;
+        card.TrafficTotalsText = trafficTotals;
+        card.TrafficRatesText = trafficRates;
         card.IdentityDetails = identityDetails;
         card.Nickname = nickname;
         card.NetworkBox = networkBox;
@@ -703,11 +760,10 @@ public partial class MainWindow : Window
         {
             var profileName = BuildProfileName(adapter);
             await Task.Run(() => AddProfileAndConnect(profileName, adapter.Name, ssid, password));
-            ClearCardPassword(card);
             var verified = false;
-            for (var attempt = 0; attempt < 8; attempt++)
+            for (var attempt = 0; attempt < 20; attempt++)
             {
-                await Task.Delay(1500);
+                await Task.Delay(1000);
                 var latest = await Task.Run(ReadNetshInterfaces);
                 var current = latest.FirstOrDefault(x => x.Name.Equals(adapter.Name, StringComparison.OrdinalIgnoreCase));
                 if (current is null) continue;
@@ -728,13 +784,21 @@ public partial class MainWindow : Window
             }
             if (verified)
             {
+                ClearCardPassword(card);
                 SetCardStatus(card, "VERIFIED: connected to '" + ssid + "' on " + card.Adapter.Name + ".", GreenBrush);
                 StatusText.Text = "Connection verified on " + card.Adapter.Name + ".";
             }
             else
             {
-                SetCardStatus(card, "Windows accepted the request, but the selected SSID was not verified within 12 seconds. Check signal, password and driver, then refresh.", AmberBrush);
-                StatusText.Text = "Connection request accepted; connection state not yet verified.";
+                var currentState = card.Adapter.State;
+                var detail = currentState.Equals("authenticating", StringComparison.OrdinalIgnoreCase)
+                    || currentState.Equals("associating", StringComparison.OrdinalIgnoreCase)
+                    ? "Windows is still " + currentState + ". Check that the password is correct and that the router accepts WPA2-Personal."
+                    : currentState.Equals("connected", StringComparison.OrdinalIgnoreCase)
+                        ? "Windows reports connection to '" + card.Adapter.Ssid + "', not the requested SSID '" + ssid + "'."
+                        : "Windows did not complete the connection. Check the password, router security mode and signal.";
+                SetCardStatus(card, "NOT VERIFIED after 20 seconds. " + detail + " Your password has been kept so you can retry.", AmberBrush);
+                StatusText.Text = "Connection was not verified on " + card.Adapter.Name + "; password retained for retry.";
             }
             UpdateSummaryCounts();
         }
@@ -859,6 +923,119 @@ public partial class MainWindow : Window
         var result = RunNetsh("wlan", "show", "interfaces");
         EnsureNetshSuccess(result, "Refresh WLAN connection status");
         return ParseInterfaces(result.StandardOutput);
+    }
+
+    private async Task RefreshTrafficAsync()
+    {
+        if (_trafficPollBusy || _adapterCards.Count == 0) return;
+        _trafficPollBusy = true;
+        try
+        {
+            var samples = await Task.Run(ReadTrafficSamples);
+            var now = DateTime.UtcNow;
+            foreach (var card in _adapterCards)
+            {
+                var sample = FindTrafficSample(card.Adapter, samples);
+                if (sample is null)
+                {
+                    card.TrafficTotalsText.Text = "Received: unavailable  |  Sent: unavailable";
+                    card.TrafficRatesText.Text = "Windows did not expose counters for this interface.";
+                    card.HasTrafficSample = false;
+                    continue;
+                }
+
+                card.TrafficTotalsText.Text = "Received: " + FormatBytes(sample.BytesReceived)
+                    + "  |  Sent: " + FormatBytes(sample.BytesSent);
+
+                if (card.HasTrafficSample)
+                {
+                    var elapsed = Math.Max(0.25, (now - card.LastTrafficSampleUtc).TotalSeconds);
+                    var receivedDelta = Math.Max(0, sample.BytesReceived - card.LastBytesReceived);
+                    var sentDelta = Math.Max(0, sample.BytesSent - card.LastBytesSent);
+                    var receiveMbps = receivedDelta * 8d / elapsed / 1_000_000d;
+                    var sendMbps = sentDelta * 8d / elapsed / 1_000_000d;
+                    card.TrafficRatesText.Text = "Live: ↓ " + receiveMbps.ToString("0.00", CultureInfo.InvariantCulture)
+                        + " Mbps received  |  ↑ " + sendMbps.ToString("0.00", CultureInfo.InvariantCulture)
+                        + " Mbps sent";
+                }
+                else
+                {
+                    card.TrafficRatesText.Text = "Live rate: calculating (first counter sample)...";
+                }
+
+                card.LastBytesReceived = sample.BytesReceived;
+                card.LastBytesSent = sample.BytesSent;
+                card.LastTrafficSampleUtc = now;
+                card.HasTrafficSample = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            foreach (var card in _adapterCards)
+                card.TrafficRatesText.Text = "Traffic counter read failed: " + ex.Message;
+        }
+        finally
+        {
+            _trafficPollBusy = false;
+        }
+    }
+
+    private static List<TrafficSample> ReadTrafficSamples()
+    {
+        var samples = new List<TrafficSample>();
+        foreach (var network in NetworkInterface.GetAllNetworkInterfaces())
+        {
+            try
+            {
+                var statistics = network.GetIPStatistics();
+                samples.Add(new TrafficSample(
+                    network.Id ?? "",
+                    network.Name ?? "",
+                    network.GetPhysicalAddress()?.ToString() ?? "",
+                    statistics.BytesReceived,
+                    statistics.BytesSent));
+            }
+            catch
+            {
+                // An adapter that is being removed or has no IP statistics is skipped for this sample.
+            }
+        }
+        return samples;
+    }
+
+    private static TrafficSample? FindTrafficSample(WifiInterface adapter, IReadOnlyList<TrafficSample> samples)
+    {
+        if (Guid.TryParse(NormalizeGuid(adapter.InterfaceGuid), out var interfaceGuid))
+        {
+            var byGuid = samples.FirstOrDefault(sample =>
+                Guid.TryParse(NormalizeGuid(sample.Id), out var sampleGuid) && sampleGuid == interfaceGuid);
+            if (byGuid is not null) return byGuid;
+        }
+
+        var mac = NormalizeMac(adapter.MacAddress);
+        if (!string.IsNullOrWhiteSpace(mac))
+        {
+            var byMac = samples.FirstOrDefault(sample =>
+                string.Equals(NormalizeMac(sample.MacAddress), mac, StringComparison.OrdinalIgnoreCase));
+            if (byMac is not null) return byMac;
+        }
+
+        return samples.FirstOrDefault(sample =>
+            string.Equals(sample.Name, adapter.Name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizeMac(string value) =>
+        new string((value ?? "").Where(Uri.IsHexDigit).ToArray());
+
+    private static string FormatBytes(long bytes)
+    {
+        const double kb = 1000d;
+        const double mb = 1000d * 1000d;
+        const double gb = 1000d * 1000d * 1000d;
+        if (bytes >= gb) return (bytes / gb).ToString("0.00", CultureInfo.InvariantCulture) + " GB";
+        if (bytes >= mb) return (bytes / mb).ToString("0.00", CultureInfo.InvariantCulture) + " MB";
+        if (bytes >= kb) return (bytes / kb).ToString("0.00", CultureInfo.InvariantCulture) + " KB";
+        return bytes.ToString(CultureInfo.InvariantCulture) + " B";
     }
 
     private async Task RefreshSavedProfilesAsync(bool showStatus = true)

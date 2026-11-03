@@ -117,7 +117,7 @@
                     CornerRadius="9" Padding="13,9" VerticalAlignment="Center">
                 <StackPanel>
                     <TextBlock Text="BUILD" Foreground="#98E0C2" FontSize="8" FontWeight="Bold" HorizontalAlignment="Center"/>
-                    <TextBlock Text="1.1 · MULTI-ADAPTER" Foreground="#D0F5E5" FontSize="10" FontWeight="Bold"
+                    <TextBlock Text="1.2 · TRAFFIC MONITOR" Foreground="#D0F5E5" FontSize="10" FontWeight="Bold"
                                Margin="0,3,0,0" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Border>

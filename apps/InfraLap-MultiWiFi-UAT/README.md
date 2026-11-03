@@ -1,57 +1,36 @@
-# InfraLap MultiWiFi — Multi-adapter UAT 1.1
+# InfraLap MultiWiFi — Multi-adapter UAT 1.2
 
-## New in 1.1
-- Replaced the fixed two-connection layout with a dynamic adapter workspace.
-- Creates one connection card for every Wi-Fi interface currently reported by Windows.
-- Each adapter card has its own editable SSID, WPA2-Personal password, connect/disconnect actions, signal indicator and Windows connection readback.
-- Displays interface name, adapter description, MAC address, WLAN interface GUID and Plug-and-Play device ID when Windows exposes the values.
-- Supports optional labels such as Built-in Intel or TP-Link USB. Labels are stored locally in the current user's AppData folder and keyed by PnP device ID (falling back to MAC/GUID).
-- Rebuilds the adapter list after USB plug/unplug and attempts to preserve labels and SSID selections by hardware identity.
-- Reports VERIFIED only when Windows reports the requested SSID connected on the selected interface.
-- Shows a warning before switching an adapter that is already connected to another SSID.
-- Saved Windows WPA2 profiles can be loaded into any selected detected adapter.
-- Diagnostics include WLAN and PnP hardware details but never Wi-Fi passwords.
-- Retains the logo-free dark control-center design.
+## New in 1.2 — Per-adapter traffic monitor and connection feedback
+- Each detected WLAN adapter card shows cumulative received and sent bytes, formatted as KB/MB/GB.
+- Each card also shows live receive and send rates in Mbps, calculated from successive Windows per-interface IP-statistics counter samples.
+- Traffic counters are matched to the WLAN interface by interface GUID first, MAC address second, and Windows interface name as a fallback.
+- Totals are Windows interface counters; they accumulate while the interface is active and can reset when Windows, the driver or the adapter resets. They are not a billable data-usage meter and may include local-network traffic.
+- Connection verification now waits up to 20 seconds and distinguishes authentication/association, connected-to-different-SSID, and not-connected outcomes.
+- Connection passwords are retained in the relevant card when the connection is not verified, so the user can correct the password and retry. A password is cleared after the requested SSID is verified.
 
-## Hardware identity
-Windows interface names and GUIDs identify active WLAN interfaces. InfraLap also queries the Windows Win32_NetworkAdapter inventory to associate interface names with MAC address, manufacturer and PnP device instance ID. Identical model names can be distinguished using interface name, MAC address and PnP instance ID.
-
-If the PnP ID is unavailable, InfraLap falls back to MAC address, GUID and interface name. A USB adapter that is unplugged and re-enumerated may receive a new interface name or GUID; refresh adapters after plugging it back in.
-
-## Connection model
-- One card represents one WLAN interface reported by Windows.
-- One physical Wi-Fi adapter normally maintains one infrastructure Wi-Fi client connection at a time.
-- Independent simultaneous connections to different SSIDs require separate physical Wi-Fi adapters and compatible drivers.
-- InfraLap uses netsh wlan to add a WPA2-Personal profile to the selected interface and request connection.
-- Windows status is polled after the request. InfraLap reports a verified connection only when the selected interface reports the requested SSID.
-- The connection editor supports WPA2-Personal (WPA2-PSK/AES) passphrases from 8 to 63 characters. Open, enterprise and other security profile types are not created by this editor.
-
-## Password handling
-- Connection passwords are entered and processed locally.
-- The app does not save connection passwords in its own settings.
-- Temporary XML profile files are deleted after the Windows profile-import attempt (best-effort cleanup).
-- Saved-profile passwords are hidden by default and shown only when requested.
-- Plain-text access to saved Windows WLAN keys is controlled by Windows permissions.
-- Passwords and saved keys are never included in diagnostic exports.
-- Adapter labels are stored in the current user's AppData folder under InfraLap MultiWiFi; no passwords are stored in that file.
+## Existing 1.1 features
+- Dynamic card for every Wi-Fi interface reported by Windows.
+- Adapter labels, MAC/GUID/PnP identity, separate SSID/password controls, connect/disconnect and saved profile management.
+- Passwords excluded from diagnostics.
+- Independent simultaneous connections require separate physical Wi-Fi adapters.
+- WPA2-Personal is the supported connection-editor authentication mode; other saved profile types can be displayed but not created with this editor.
 
 ## Important limitations
-- A successful Windows build does not prove compatibility with every USB Wi-Fi chipset, hardware revision or driver.
-- The USB adapter must appear as a separate WLAN interface before it gets its own card.
-- Windows Dual-STA is driver-managed and synchronized; InfraLap does not promise arbitrary independent SSIDs on one physical adapter.
-- This app manages WLAN interfaces; it does not bond internet bandwidth.
-- PnP metadata is queried through Windows CIM inventory. The app falls back to MAC/GUID/name when PnP metadata is unavailable.
+- A successful CI build does not confirm compatibility with every USB chipset, hardware revision or driver.
+- The TP-Link adapter must appear as a separate WLAN interface before a second adapter card can be displayed.
+- Per-adapter live rates are calculated from Windows counters and can vary with the one-second sample interval.
+- The app manages Wi-Fi interfaces; it does not bond or combine internet bandwidth.
+- Windows Dual-STA does not guarantee arbitrary independent SSIDs on a single physical adapter.
 
 ## UAT checklist
 1. Install on Windows 11 x64.
-2. With only the built-in Wi-Fi adapter enabled, verify one adapter card is shown.
-3. Plug in the USB Wi-Fi adapter and install its Windows driver if required, then select Refresh adapters.
-4. Confirm a second card appears with a separate Windows interface and hardware identity.
-5. Label the adapters Built-in Intel and TP-Link USB.
-6. Scan nearby networks; choose separate SSIDs on the two cards.
-7. Connect each adapter independently and verify both report the correct SSID.
-8. Disconnect one adapter and verify the other stays connected.
-9. Unplug/replug the USB adapter, refresh, and check label restoration.
-10. Export diagnostics and verify no Wi-Fi passwords are present.
+2. Verify the Intel internal WLAN adapter is shown as one card.
+3. Plug in the TP-Link Archer T2U Plus; install the correct driver if required and refresh adapters.
+4. Verify a second card appears for the USB WLAN interface.
+5. Set readable labels such as Built-in Intel and TP-Link USB.
+6. Confirm each card shows its own received MB, sent MB, live receive Mbps and live send Mbps.
+7. Connect each adapter to a different WPA2-Personal SSID and verify the SSID readback independently.
+8. Disconnect one adapter and confirm the other stays connected.
+9. Check diagnostics contain no Wi-Fi passwords.
 
-Windows 11 x64 UAT build. Real hardware testing is required after the USB adapter arrives.
+Windows 11 x64 UAT build. Hardware testing is still required on the target laptop and USB adapter.

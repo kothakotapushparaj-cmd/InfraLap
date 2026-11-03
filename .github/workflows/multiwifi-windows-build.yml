@@ -45,7 +45,7 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer/InfraLap-MultiWiFi.iss"
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
-          $installer = "installer-output/InfraLap-MultiWiFi-Setup-x64-v1.1.exe"
+          $installer = "installer-output/InfraLap-MultiWiFi-Setup-x64-v1.2.exe"
           if (-not (Test-Path $installer)) { throw "Installer EXE was not generated." }
           Get-Item $installer | Format-List FullName,Length,LastWriteTime
       - name: Upload installer artifact
