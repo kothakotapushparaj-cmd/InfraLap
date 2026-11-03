@@ -79,8 +79,9 @@ jobs:
           $installerScript = [IO.Path]::GetFullPath($installerScript)
           $iss = Get-Content -Raw -Path $installerScript
           $iss = $iss.Replace('; Flags: checked', '')
+          $iss = $iss.Replace('Source: "..\publish\win-x64\*"', 'Source: "..\src\InfraLap.MultiWiFi.App\publish\win-x64\*"')
           Set-Content -Path $installerScript -Value $iss -NoNewline -Encoding utf8
-          Write-Host 'Removed unsupported Inno Setup task flag.'
+          Write-Host 'Fixed Inno Setup task flag and published-file path.'
 
       - name: Publish self-contained Windows x64 application
         shell: pwsh
