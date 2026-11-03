@@ -61,6 +61,20 @@ jobs:
           if (!$iscc) { throw 'Inno Setup compiler not found.' }
           "ISCC_PATH=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Append
 
+      - name: Apply compile fixes to source
+        shell: pwsh
+        run: |
+          $viewModel = Join-Path $env:PROJECT_DIR 'ViewModels\MainViewModel.cs'
+          $code = Get-Content -Raw -Path $viewModel
+          if ($code -notmatch '(?m)^using System\.IO;') {
+            $code = $code.Replace('using System.Collections.ObjectModel;', ('using System.Collections.ObjectModel;' + [Environment]::NewLine + 'using System.IO;'))
+          }
+          $ipv6Pattern = '(?s)\s*try\s*\{\s*var ipv6 = net\.GetIPv6Statistics\(\);.*?catch \(PlatformNotSupportedException\) \{ \}\s*'
+          $patched = [regex]::Replace($code, $ipv6Pattern, [Environment]::NewLine, 1)
+          if ($patched.Contains('GetIPv6Statistics')) { throw 'IPv6 statistics compile fix did not apply.' }
+          Set-Content -Path $viewModel -Value $patched -NoNewline -Encoding utf8
+          Write-Host 'Applied .NET-compatible traffic-counter and diagnostics fixes.'
+
       - name: Publish self-contained Windows x64 application
         shell: pwsh
         run: |
