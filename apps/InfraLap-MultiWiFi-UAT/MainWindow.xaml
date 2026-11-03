@@ -122,7 +122,7 @@
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" VerticalAlignment="Center">
                 <TextBlock Text="WIRELESS NETWORK CONTROL" Foreground="#75A9FF"
-                           FontSize="10" FontWeight="Bold" CharacterSpacing="1.5"/>
+                           FontSize="10" FontWeight="Bold"/>
                 <TextBlock Text="MultiWiFi Control Center" FontSize="29"
                            FontWeight="Bold" Margin="0,4,0,0"/>
                 <TextBlock Text="Manage adapters, connect to separate networks, inspect saved profiles and export diagnostics."
