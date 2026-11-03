@@ -6,8 +6,7 @@ on:
     branches:
       - multiwifi-v1.2.1-build-clean
     paths:
-      - 'MultiWiFi/v1.2.1-payload/**'
-      - 'MultiWiFi/BUILD-TRIGGER.txt'
+      - 'MultiWiFi/InfraLap-MultiWiFi-v1.2.1-source.zip'
       - '.github/workflows/build-multiwifi-v1.2.1.yml'
 
 permissions:
@@ -20,27 +19,17 @@ jobs:
       - name: Checkout build branch
         uses: actions/checkout@v4
 
-      - name: Reconstruct and verify source ZIP
+      - name: Verify and extract supplied source ZIP
         shell: pwsh
         run: |
-          $partsDir = Join-Path $env:GITHUB_WORKSPACE 'MultiWiFi/v1.2.1-payload'
-          $parts = @(Get-ChildItem $partsDir -Filter 'part-*.b64' | Sort-Object Name)
-          if ($parts.Count -ne 11) { throw "Expected 11 payload parts; found $($parts.Count)." }
-          $encoded = [System.Text.StringBuilder]::new()
-          foreach ($part in $parts) { [void]$encoded.Append((Get-Content -LiteralPath $part.FullName -Raw).Trim()) }
-          $archive = Join-Path $env:RUNNER_TEMP 'InfraLap-MultiWiFi-v1.2.1-source.zip'
-          [System.IO.File]::WriteAllBytes($archive, [Convert]::FromBase64String($encoded.ToString()))
-          $zip = [System.IO.Compression.ZipFile]::OpenRead($archive)
-          try {
-            $entry = $zip.Entries | Where-Object { $_.FullName -like '*/InfraLap.MultiWiFi.App.csproj' } | Select-Object -First 1
-            if (!$entry) { throw 'Project file missing from reconstructed source ZIP.' }
-          } finally { $zip.Dispose() }
+          $archive = Join-Path $env:GITHUB_WORKSPACE 'MultiWiFi/InfraLap-MultiWiFi-v1.2.1-source.zip'
+          if (!(Test-Path $archive)) { throw 'Source ZIP missing at MultiWiFi/InfraLap-MultiWiFi-v1.2.1-source.zip.' }
           $sourceRoot = Join-Path $env:RUNNER_TEMP 'infralap-multiwifi-source'
           New-Item -ItemType Directory -Force -Path $sourceRoot | Out-Null
           Expand-Archive -Path $archive -DestinationPath $sourceRoot -Force
           $project = Get-ChildItem $sourceRoot -Filter 'InfraLap.MultiWiFi.App.csproj' -Recurse | Select-Object -First 1
           $installer = Get-ChildItem $sourceRoot -Filter 'InfraLap-MultiWiFi.iss' -Recurse | Select-Object -First 1
-          if (!$project -or !$installer) { throw 'Project or Inno Setup script missing after extraction.' }
+          if (!$project -or !$installer) { throw 'The ZIP does not contain the WPF project and Inno Setup script.' }
           "PROJECT_FILE=$($project.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
           "PROJECT_DIR=$($project.Directory.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
           "INSTALLER_SCRIPT=$($installer.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
@@ -59,14 +48,14 @@ jobs:
           if (!$iscc) { throw 'Inno Setup compiler not found.' }
           "ISCC_PATH=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Publish self-contained Windows x64 app
+      - name: Publish self-contained Windows x64 application
         shell: pwsh
         run: |
           $publish = Join-Path $env:PROJECT_DIR 'publish\win-x64'
           dotnet publish $env:PROJECT_FILE -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o $publish
           if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE." }
           $appExe = Join-Path $publish 'InfraLap.MultiWiFi.exe'
-          if (!(Test-Path $appExe)) { throw 'Published app EXE was not generated.' }
+          if (!(Test-Path $appExe)) { throw 'Published application EXE was not generated.' }
 
       - name: Build Setup.exe
         shell: pwsh
