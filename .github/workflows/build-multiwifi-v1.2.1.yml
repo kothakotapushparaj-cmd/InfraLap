@@ -75,6 +75,12 @@ jobs:
           if ($patched.Contains('GetIPv6Statistics')) { throw 'IPv6 statistics compile fix did not apply.' }
           Set-Content -Path $viewModel -Value $patched -NoNewline -Encoding utf8
           Write-Host 'Applied .NET-compatible traffic-counter and diagnostics fixes.'
+          $installerScript = Join-Path (Split-Path $env:PROJECT_DIR -Parent) '..\\installer\\InfraLap-MultiWiFi.iss'
+          $installerScript = [IO.Path]::GetFullPath($installerScript)
+          $iss = Get-Content -Raw -Path $installerScript
+          $iss = $iss.Replace('; Flags: checked', '')
+          Set-Content -Path $installerScript -Value $iss -NoNewline -Encoding utf8
+          Write-Host 'Removed unsupported Inno Setup task flag.'
 
       - name: Publish self-contained Windows x64 application
         shell: pwsh
