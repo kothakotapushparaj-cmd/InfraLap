@@ -67,23 +67,27 @@ public partial class MainWindow : Window
         public Border Root { get; set; } = null!;
         public TextBlock Heading { get; set; } = null!;
         public TextBlock InterfaceLine { get; set; } = null!;
-        public TextBlock ConnectionBadge { get; set; } = null!;
+        public TextBlock Badge { get; set; } = null!;
         public TextBlock Status { get; set; } = null!;
         public TextBlock SignalLabel { get; set; } = null!;
         public ProgressBar SignalBar { get; set; } = null!;
         public TextBlock IdentityDetails { get; set; } = null!;
         public TextBox Nickname { get; set; } = null!;
         public ComboBox NetworkBox { get; set; } = null!;
-        public PasswordBox PasswordInput { get; set; } = null!;
-        public TextBox PlainPasswordInput { get; set; } = null!;
+        public PasswordBox PasswordBox { get; set; } = null!;
+        public TextBox PlainPasswordBox { get; set; } = null!;
         public Button TogglePasswordButton { get; set; } = null!;
         public Button ConnectButton { get; set; } = null!;
         public Button DisconnectButton { get; set; } = null!;
         public bool IsBusy { get; set; }
-        public string TargetSsid => NetworkBox.SelectedItem is WifiNetwork item ? item.Ssid : NetworkBox.Text.Trim();
-        public string Password => PlainPasswordInput.Visibility == Visibility.Visible
-            ? PlainPasswordInput.Text : PasswordInput.Password;
+        public string TargetSsid => !string.IsNullOrWhiteSpace(NetworkBox.Text)
+            ? NetworkBox.Text.Trim()
+            : (NetworkBox.SelectedItem as WifiNetwork)?.Ssid ?? "";
+        public string Password => PlainPasswordBox.Visibility == Visibility.Visible
+            ? PlainPasswordBox.Text : PasswordBox.Password;
     }
+
+    private sealed record CardSnapshot(string Ssid, string Nickname);
 
     private readonly List<WifiInterface> _interfaces = new();
     private readonly List<WifiNetwork> _scannedNetworks = new();
@@ -91,11 +95,12 @@ public partial class MainWindow : Window
     private SavedWifiProfile? _selectedSavedProfile;
     private readonly List<AdapterCard> _adapterCards = new();
     private Dictionary<string, string> _adapterLabels = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly Brush MutedBrush = BrushFrom("#91A3BB");
-    private static readonly Brush GreenBrush = BrushFrom("#54D6A2");
-    private static readonly Brush AmberBrush = BrushFrom("#F0B86A");
-    private static readonly Brush RedBrush = BrushFrom("#F07D88");
-    private static readonly Brush BlueBrush = BrushFrom("#80B1FF");
+
+    private static readonly Brush MutedBrush = MakeBrush("#91A3BB");
+    private static readonly Brush GreenBrush = MakeBrush("#54D6A2");
+    private static readonly Brush AmberBrush = MakeBrush("#F0B86A");
+    private static readonly Brush RedBrush = MakeBrush("#F07D88");
+    private static readonly Brush BlueBrush = MakeBrush("#80B1FF");
 
     public MainWindow()
     {
@@ -106,8 +111,8 @@ public partial class MainWindow : Window
         {
             foreach (var card in _adapterCards)
             {
-                card.PasswordInput.Clear();
-                card.PlainPasswordInput.Clear();
+                card.PasswordBox.Clear();
+                card.PlainPasswordBox.Clear();
             }
             SavedPasswordHidden.Clear();
             SavedPasswordVisible.Clear();
@@ -115,7 +120,8 @@ public partial class MainWindow : Window
         };
     }
 
-    private static Brush BrushFrom(string color) => (Brush)new BrushConverter().ConvertFromString(color)!;
+    private static Brush MakeBrush(string value) => (Brush)new BrushConverter().ConvertFromString(value)!;
+
     private async void Refresh_Click(object sender, RoutedEventArgs e) => await RefreshAllAsync();
     private async void Scan_Click(object sender, RoutedEventArgs e) => await ScanNetworksAsync();
     private async void SavedProfiles_Click(object sender, RoutedEventArgs e) => await RefreshSavedProfilesAsync();
@@ -130,9 +136,8 @@ public partial class MainWindow : Window
         try
         {
             var snapshots = _adapterCards.ToDictionary(
-                x => x.Adapter.IdentityKey,
-                x => new CardSnapshot(x.TargetSsid, x.Nickname.Text, x.Password,
-                    x.PlainPasswordInput.Visibility == Visibility.Visible),
+                c => c.Adapter.IdentityKey,
+                c => new CardSnapshot(c.TargetSsid, c.Nickname.Text),
                 StringComparer.OrdinalIgnoreCase);
 
             var detected = await Task.Run(ReadAdapters);
@@ -141,32 +146,23 @@ public partial class MainWindow : Window
             BuildAdapterCards(snapshots);
 
             SavedTargetAdapter.ItemsSource = _interfaces;
-            if (_interfaces.Count > 0)
-            {
-                var savedMatch = _selectedSavedProfile is null ? null : _interfaces.FirstOrDefault(x =>
-                    Guid.TryParse(NormalizeGuid(x.InterfaceGuid), out var id) && id == _selectedSavedProfile.AdapterGuid);
-                SavedTargetAdapter.SelectedItem = savedMatch ?? _interfaces[0];
-            }
-            else SavedTargetAdapter.SelectedItem = null;
-
+            SavedTargetAdapter.SelectedItem = _interfaces.FirstOrDefault();
             var dualSta = await Task.Run(NativeWifiService.GetDualStaSummary);
             HardwareStatus.Text = BuildHardwareSummary() + Environment.NewLine + Environment.NewLine
                 + "Driver Dual-STA report: " + dualSta;
 
-            await ScanNetworksAsync(showStatus: false);
-            await RefreshSavedProfilesAsync(showStatus: false);
+            await ScanNetworksAsync(false);
+            await RefreshSavedProfilesAsync(false);
             UpdateSummaryCounts();
             StatusText.Text = "Refresh complete. " + _interfaces.Count + " Wi-Fi interface(s) detected.";
         }
         catch (Exception ex)
         {
             StatusText.Text = "Adapter refresh failed: " + ex.Message;
-            HardwareStatus.Text = "Could not enumerate WLAN adapters. Check that the Windows WLAN service is running and drivers are installed.";
+            HardwareStatus.Text = "Could not enumerate WLAN adapters. Check the Windows WLAN service and adapter drivers.";
             MessageBox.Show(ex.Message, "InfraLap MultiWiFi", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
-
-    private sealed record CardSnapshot(string Ssid, string Nickname, string Password, bool PasswordVisible);
 
     private void BuildAdapterCards(IReadOnlyDictionary<string, CardSnapshot>? snapshots = null)
     {
@@ -181,14 +177,6 @@ public partial class MainWindow : Window
             {
                 SetCardSsid(card, snapshot.Ssid);
                 card.Nickname.Text = snapshot.Nickname;
-                card.PasswordInput.Password = snapshot.Password;
-                card.PlainPasswordInput.Text = snapshot.Password;
-                if (snapshot.PasswordVisible)
-                {
-                    card.PasswordInput.Visibility = Visibility.Collapsed;
-                    card.PlainPasswordInput.Visibility = Visibility.Visible;
-                    card.TogglePasswordButton.Content = "Hide password";
-                }
             }
             _adapterCards.Add(card);
             AdapterCardsPanel.Children.Add(card.Root);
@@ -203,9 +191,13 @@ public partial class MainWindow : Window
         var card = new AdapterCard { Adapter = adapter };
         var root = new Border
         {
-            Width = 520, Margin = new Thickness(6), Padding = new Thickness(15),
-            CornerRadius = new CornerRadius(12), Background = BrushFrom("#142238"),
-            BorderBrush = BrushFrom("#304866"), BorderThickness = new Thickness(1)
+            Width = 520,
+            Margin = new Thickness(6),
+            Padding = new Thickness(15),
+            CornerRadius = new CornerRadius(12),
+            Background = MakeBrush("#142238"),
+            BorderBrush = MakeBrush("#304866"),
+            BorderThickness = new Thickness(1)
         };
         var panel = new StackPanel();
         root.Child = panel;
@@ -222,8 +214,9 @@ public partial class MainWindow : Window
         var heading = new TextBlock
         {
             Text = string.IsNullOrWhiteSpace(adapter.Description) ? adapter.Name : adapter.Description,
-            FontSize = 16, FontWeight = FontWeights.Bold, TextWrapping = TextWrapping.Wrap,
-            TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 4, 8, 0)
+            FontSize = 16, FontWeight = FontWeights.Bold,
+            TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis,
+            Margin = new Thickness(0, 4, 8, 0)
         };
         var interfaceLine = new TextBlock
         {
@@ -236,8 +229,9 @@ public partial class MainWindow : Window
 
         var badge = new TextBlock
         {
-            Text = adapter.State.ToUpperInvariant(), Foreground = GreenBrush,
-            Background = BrushFrom("#18392F"), FontSize = 8, FontWeight = FontWeights.Bold,
+            Text = adapter.State.ToUpperInvariant(),
+            Foreground = GreenBrush, Background = MakeBrush("#18392F"),
+            FontSize = 8, FontWeight = FontWeights.Bold,
             Padding = new Thickness(9, 6, 9, 6), VerticalAlignment = VerticalAlignment.Top
         };
         Grid.SetColumn(badge, 1);
@@ -248,8 +242,8 @@ public partial class MainWindow : Window
         var nickname = new TextBox
         {
             Height = 34, Margin = new Thickness(0, 4, 0, 10),
-            Text = _adapterLabels.TryGetValue(adapter.IdentityKey, out var savedLabel) ? savedLabel : "",
-            ToolTip = "Optional name such as Office Wi-Fi or Backup USB"
+            Text = _adapterLabels.TryGetValue(adapter.IdentityKey, out var label) ? label : "",
+            ToolTip = "Optional label such as Built-in Intel or TP-Link USB"
         };
         nickname.LostFocus += (_, _) => SaveAdapterLabel(card);
         nickname.TextChanged += (_, _) =>
@@ -264,14 +258,13 @@ public partial class MainWindow : Window
         panel.Children.Add(MakeLabel("CHOOSE NETWORK / SSID"));
         var networkBox = new ComboBox
         {
-            Height = 40, Margin = new Thickness(0, 4, 0, 10), IsEditable = true,
-            IsTextSearchEnabled = true, StaysOpenOnEdit = false,
-            DisplayMemberPath = nameof(WifiNetwork.Ssid),
+            Height = 40, Margin = new Thickness(0, 4, 0, 10),
+            IsEditable = true, IsTextSearchEnabled = true, StaysOpenOnEdit = false,
             ItemTemplate = (DataTemplate)FindResource("NetworkItemTemplate"),
-            ItemsSource = _scannedNetworks, ToolTip = "Select a scanned network or type a hidden SSID"
+            ItemsSource = _scannedNetworks,
+            ToolTip = "Select a scanned network or type a hidden SSID"
         };
-        TextSearch.SetTextPath(networkBox, nameof(WifiNetwork.Ssid));
-        networkBox.SelectionChanged += (_, _) => UpdateCardReadback(card);
+        TextSearch.SetTextPath(networkBox, "Ssid");
         panel.Children.Add(networkBox);
 
         panel.Children.Add(MakeLabel("WPA2-PERSONAL PASSWORD"));
@@ -291,8 +284,8 @@ public partial class MainWindow : Window
         var connectButton = new Button { Content = "Connect", MinWidth = 82 };
         var disconnectButton = new Button
         {
-            Content = "Disconnect", MinWidth = 86, Style = (Style)FindResource("DangerButton"),
-            Margin = new Thickness(7, 0, 0, 0)
+            Content = "Disconnect", MinWidth = 86,
+            Style = (Style)FindResource("DangerButton"), Margin = new Thickness(7, 0, 0, 0)
         };
         actionRow.Children.Add(toggleButton);
         actionRow.Children.Add(connectButton);
@@ -304,13 +297,14 @@ public partial class MainWindow : Window
         signalPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         var signalLabel = new TextBlock
         {
-            Text = "Signal unavailable", Foreground = MutedBrush, FontSize = 9,
-            VerticalAlignment = VerticalAlignment.Center
+            Text = adapter.SignalPercent >= 0 ? "Signal " + adapter.SignalPercent + "%" : "Signal unavailable",
+            Foreground = MutedBrush, FontSize = 9, VerticalAlignment = VerticalAlignment.Center
         };
         var signalBar = new ProgressBar
         {
-            Minimum = 0, Maximum = 100, Height = 7, VerticalAlignment = VerticalAlignment.Center,
-            Background = BrushFrom("#263952"), Foreground = GreenBrush
+            Minimum = 0, Maximum = 100, Value = Math.Max(0, adapter.SignalPercent),
+            Height = 7, VerticalAlignment = VerticalAlignment.Center,
+            Background = MakeBrush("#263952"), Foreground = GreenBrush
         };
         Grid.SetColumn(signalBar, 1);
         signalPanel.Children.Add(signalLabel);
@@ -319,7 +313,7 @@ public partial class MainWindow : Window
 
         var statusBorder = new Border
         {
-            Background = BrushFrom("#0B1728"), BorderBrush = BrushFrom("#293D59"),
+            Background = MakeBrush("#0B1728"), BorderBrush = MakeBrush("#293D59"),
             BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(7), Padding = new Thickness(10)
         };
         var status = new TextBlock
@@ -333,12 +327,12 @@ public partial class MainWindow : Window
         var expander = new Expander
         {
             Header = "Hardware identity · MAC · GUID · Plug-and-Play ID",
-            Foreground = BrushFrom("#C4D5EA"), FontSize = 9, Margin = new Thickness(0, 10, 0, 0)
+            Foreground = MakeBrush("#C4D5EA"), FontSize = 9, Margin = new Thickness(0, 10, 0, 0)
         };
         var identityDetails = new TextBlock
         {
-            Foreground = MutedBrush, FontFamily = new FontFamily("Consolas"),
-            FontSize = 8, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.None,
+            Foreground = MutedBrush, FontFamily = new FontFamily("Consolas"), FontSize = 8,
+            TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.None,
             Margin = new Thickness(0, 7, 0, 4)
         };
         expander.Content = identityDetails;
@@ -347,15 +341,15 @@ public partial class MainWindow : Window
         card.Root = root;
         card.Heading = heading;
         card.InterfaceLine = interfaceLine;
-        card.ConnectionBadge = badge;
+        card.Badge = badge;
         card.Status = status;
         card.SignalLabel = signalLabel;
         card.SignalBar = signalBar;
         card.IdentityDetails = identityDetails;
         card.Nickname = nickname;
         card.NetworkBox = networkBox;
-        card.PasswordInput = passwordBox;
-        card.PlainPasswordInput = plainPassword;
+        card.PasswordBox = passwordBox;
+        card.PlainPasswordBox = plainPassword;
         card.TogglePasswordButton = toggleButton;
         card.ConnectButton = connectButton;
         card.DisconnectButton = disconnectButton;
@@ -387,7 +381,8 @@ public partial class MainWindow : Window
             if (File.Exists(AdapterLabelsPath))
             {
                 var loaded = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(AdapterLabelsPath));
-                if (loaded is not null) _adapterLabels = new Dictionary<string, string>(loaded, StringComparer.OrdinalIgnoreCase);
+                if (loaded is not null)
+                    _adapterLabels = new Dictionary<string, string>(loaded, StringComparer.OrdinalIgnoreCase);
             }
         }
         catch { _adapterLabels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase); }
@@ -410,28 +405,28 @@ public partial class MainWindow : Window
 
     private void ToggleCardPassword(AdapterCard card)
     {
-        if (card.PlainPasswordInput.Visibility == Visibility.Visible)
+        if (card.PlainPasswordBox.Visibility == Visibility.Visible)
         {
-            card.PasswordInput.Password = card.PlainPasswordInput.Text;
-            card.PlainPasswordInput.Visibility = Visibility.Collapsed;
-            card.PasswordInput.Visibility = Visibility.Visible;
+            card.PasswordBox.Password = card.PlainPasswordBox.Text;
+            card.PlainPasswordBox.Visibility = Visibility.Collapsed;
+            card.PasswordBox.Visibility = Visibility.Visible;
             card.TogglePasswordButton.Content = "Show password";
         }
         else
         {
-            card.PlainPasswordInput.Text = card.PasswordInput.Password;
-            card.PasswordInput.Visibility = Visibility.Collapsed;
-            card.PlainPasswordInput.Visibility = Visibility.Visible;
+            card.PlainPasswordBox.Text = card.PasswordBox.Password;
+            card.PasswordBox.Visibility = Visibility.Collapsed;
+            card.PlainPasswordBox.Visibility = Visibility.Visible;
             card.TogglePasswordButton.Content = "Hide password";
         }
     }
 
     private static void ClearCardPassword(AdapterCard card)
     {
-        card.PasswordInput.Clear();
-        card.PlainPasswordInput.Clear();
-        card.PasswordInput.Visibility = Visibility.Visible;
-        card.PlainPasswordInput.Visibility = Visibility.Collapsed;
+        card.PasswordBox.Clear();
+        card.PlainPasswordBox.Clear();
+        card.PasswordBox.Visibility = Visibility.Visible;
+        card.PlainPasswordBox.Visibility = Visibility.Collapsed;
         card.TogglePasswordButton.Content = "Show password";
     }
 
@@ -445,7 +440,11 @@ public partial class MainWindow : Window
         }
         var match = _scannedNetworks.FirstOrDefault(x => string.Equals(x.Ssid, ssid, StringComparison.Ordinal));
         if (match is not null) card.NetworkBox.SelectedItem = match;
-        else { card.NetworkBox.SelectedItem = null; card.NetworkBox.Text = ssid; }
+        else
+        {
+            card.NetworkBox.SelectedItem = null;
+            card.NetworkBox.Text = ssid;
+        }
     }
 
     private async Task ScanNetworksAsync(bool showStatus = true)
@@ -467,7 +466,7 @@ public partial class MainWindow : Window
                 if (previous.TryGetValue(card.Adapter.IdentityKey, out var ssid)) SetCardSsid(card, ssid);
             }
             if (showStatus)
-                StatusText.Text = "Scan complete: " + _scannedNetworks.Count + " unique SSID(s) found. Select a network on an adapter card.";
+                StatusText.Text = "Scan complete: " + _scannedNetworks.Count + " unique SSID(s) found.";
         }
         catch (Exception ex)
         {
@@ -534,32 +533,21 @@ public partial class MainWindow : Window
         EnsureNetshSuccess(interfacesResult, "Read WLAN interfaces");
         var interfaces = ParseInterfaces(interfacesResult.StandardOutput);
         var hardware = ReadHardwareIdentities();
-
-        return interfaces
-            .Where(wlan =>
+        return interfaces.Select(wlan =>
+        {
+            var info = hardware.FirstOrDefault(x =>
+                string.Equals(x.InterfaceName, wlan.Name, StringComparison.OrdinalIgnoreCase)
+                || (!string.IsNullOrWhiteSpace(wlan.InterfaceGuid)
+                    && string.Equals(NormalizeGuid(x.InterfaceGuid), NormalizeGuid(wlan.InterfaceGuid), StringComparison.OrdinalIgnoreCase)));
+            if (info is null) return wlan;
+            return wlan with
             {
-                var info = hardware.FirstOrDefault(x =>
-                    string.Equals(x.InterfaceName, wlan.Name, StringComparison.OrdinalIgnoreCase)
-                    || (!string.IsNullOrWhiteSpace(wlan.InterfaceGuid)
-                        && string.Equals(NormalizeGuid(x.InterfaceGuid), NormalizeGuid(wlan.InterfaceGuid), StringComparison.OrdinalIgnoreCase)));
-                var isClearlyVirtual = wlan.Description.Contains("Wi-Fi Direct Virtual Adapter", StringComparison.OrdinalIgnoreCase);
-                return !isClearlyVirtual && (info is null || info.PhysicalAdapter);
-            })
-            .Select(wlan =>
-            {
-                var info = hardware.FirstOrDefault(x =>
-                    string.Equals(x.InterfaceName, wlan.Name, StringComparison.OrdinalIgnoreCase)
-                    || (!string.IsNullOrWhiteSpace(wlan.InterfaceGuid)
-                        && string.Equals(NormalizeGuid(x.InterfaceGuid), NormalizeGuid(wlan.InterfaceGuid), StringComparison.OrdinalIgnoreCase)));
-                if (info is null) return wlan;
-                return wlan with
-                {
-                    MacAddress = string.IsNullOrWhiteSpace(wlan.MacAddress) ? info.MacAddress : wlan.MacAddress,
-                    PnpDeviceId = info.PnpDeviceId,
-                    Manufacturer = info.Manufacturer,
-                    InterfaceGuid = string.IsNullOrWhiteSpace(wlan.InterfaceGuid) ? info.InterfaceGuid : wlan.InterfaceGuid
-                };
-            }).ToList();
+                MacAddress = string.IsNullOrWhiteSpace(wlan.MacAddress) ? info.MacAddress : wlan.MacAddress,
+                PnpDeviceId = info.PnpDeviceId,
+                Manufacturer = info.Manufacturer,
+                InterfaceGuid = string.IsNullOrWhiteSpace(wlan.InterfaceGuid) ? info.InterfaceGuid : wlan.InterfaceGuid
+            };
+        }).ToList();
     }
 
     private static List<HardwareIdentity> ReadHardwareIdentities()
@@ -586,12 +574,14 @@ public partial class MainWindow : Window
             process.StartInfo.ArgumentList.Add("-Command");
             process.StartInfo.ArgumentList.Add(script);
             process.Start();
-            var stdout = process.StandardOutput.ReadToEnd();
-            process.StandardError.ReadToEnd();
+            var stdoutTask = process.StandardOutput.ReadToEndAsync();
+            var stderrTask = process.StandardError.ReadToEndAsync();
             process.WaitForExit();
-            if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(stdout))
+            Task.WaitAll(stdoutTask, stderrTask);
+            if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(stdoutTask.Result))
                 return new List<HardwareIdentity>();
-            using var document = JsonDocument.Parse(stdout.Trim());
+
+            using var document = JsonDocument.Parse(stdoutTask.Result.Trim());
             var items = document.RootElement.ValueKind == JsonValueKind.Array
                 ? document.RootElement.EnumerateArray().ToList()
                 : new List<JsonElement> { document.RootElement };
@@ -619,7 +609,7 @@ public partial class MainWindow : Window
         return _interfaces.Count + " WLAN interface(s) detected." + Environment.NewLine
             + connected + " currently connected." + Environment.NewLine
             + mapped + " interface(s) mapped to a Plug-and-Play hardware identity." + Environment.NewLine
-            + "Each interface is managed independently; a supported USB adapter should appear as another card after driver installation.";
+            + "Each detected interface is managed independently.";
     }
 
     private void UpdateAdapterIdentity(AdapterCard card)
@@ -638,13 +628,12 @@ public partial class MainWindow : Window
     private void UpdateCardReadback(AdapterCard card)
     {
         var adapter = card.Adapter;
-        card.ConnectionBadge.Text = adapter.State.ToUpperInvariant();
         var connected = adapter.State.Equals("connected", StringComparison.OrdinalIgnoreCase);
-        card.ConnectionBadge.Foreground = connected ? GreenBrush : AmberBrush;
-        card.ConnectionBadge.Background = BrushFrom(connected ? "#18392F" : "#3B3020");
+        card.Badge.Text = adapter.State.ToUpperInvariant();
+        card.Badge.Foreground = connected ? GreenBrush : AmberBrush;
+        card.Badge.Background = MakeBrush(connected ? "#18392F" : "#3B3020");
         card.SignalBar.Value = adapter.SignalPercent < 0 ? 0 : Math.Clamp(adapter.SignalPercent, 0, 100);
         card.SignalLabel.Text = adapter.SignalPercent >= 0 ? "Signal " + adapter.SignalPercent + "%" : "Signal unavailable";
-
         var target = card.TargetSsid;
         if (connected)
         {
@@ -680,7 +669,6 @@ public partial class MainWindow : Window
         var adapter = card.Adapter;
         var ssid = card.TargetSsid;
         var password = card.Password;
-
         if (string.IsNullOrWhiteSpace(ssid))
         {
             SetCardStatus(card, "Enter a Wi-Fi network name (SSID).", AmberBrush);
@@ -700,9 +688,9 @@ public partial class MainWindow : Window
             && !string.IsNullOrWhiteSpace(adapter.Ssid) && !string.Equals(adapter.Ssid, ssid, StringComparison.Ordinal))
         {
             var confirm = MessageBox.Show(
-                "This adapter is currently connected to '" + adapter.Ssid + "'. Connecting it to '" + ssid
-                + "' will switch this adapter's network. Other Wi-Fi adapters will not be changed. Continue?",
-                "Switch this adapter's Wi-Fi network", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                "This adapter is connected to '" + adapter.Ssid + "'. Connecting it to '" + ssid
+                + "' switches only this adapter. Other Wi-Fi adapters will not be changed. Continue?",
+                "Switch this adapter's network", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (confirm != MessageBoxResult.Yes) return;
         }
 
@@ -721,9 +709,8 @@ public partial class MainWindow : Window
             {
                 await Task.Delay(1500);
                 var latest = await Task.Run(ReadNetshInterfaces);
-                var current = latest.FirstOrDefault(x => string.Equals(x.Name, adapter.Name, StringComparison.OrdinalIgnoreCase));
+                var current = latest.FirstOrDefault(x => x.Name.Equals(adapter.Name, StringComparison.OrdinalIgnoreCase));
                 if (current is null) continue;
-
                 card.Adapter = adapter with
                 {
                     State = current.State, Ssid = current.Ssid, SignalPercent = current.SignalPercent,
@@ -732,7 +719,6 @@ public partial class MainWindow : Window
                 };
                 ReplaceInterfaceSnapshot(card.Adapter);
                 UpdateCardReadback(card);
-
                 if (current.State.Equals("connected", StringComparison.OrdinalIgnoreCase)
                     && string.Equals(current.Ssid, ssid, StringComparison.Ordinal))
                 {
@@ -740,7 +726,6 @@ public partial class MainWindow : Window
                     break;
                 }
             }
-
             if (verified)
             {
                 SetCardStatus(card, "VERIFIED: connected to '" + ssid + "' on " + card.Adapter.Name + ".", GreenBrush);
@@ -791,21 +776,20 @@ public partial class MainWindow : Window
         finally
         {
             try { if (File.Exists(tempPath)) File.Delete(tempPath); }
-            catch { /* Best-effort removal of temporary credential XML. */ }
+            catch { }
         }
     }
 
     private static XDocument BuildWpa2Profile(string profileName, string ssid, string password)
     {
         XNamespace ns = "http://www.microsoft.com/networking/WLAN/profile/v1";
-        var ssidBytes = Encoding.UTF8.GetBytes(ssid);
         return new XDocument(
             new XDeclaration("1.0", "UTF-8", "yes"),
             new XElement(ns + "WLANProfile",
                 new XElement(ns + "name", profileName),
                 new XElement(ns + "SSIDConfig",
                     new XElement(ns + "SSID",
-                        new XElement(ns + "hex", Convert.ToHexString(ssidBytes)),
+                        new XElement(ns + "hex", Convert.ToHexString(Encoding.UTF8.GetBytes(ssid))),
                         new XElement(ns + "name", ssid))),
                 new XElement(ns + "connectionType", "ESS"),
                 new XElement(ns + "connectionMode", "manual"),
@@ -828,7 +812,6 @@ public partial class MainWindow : Window
             "Disconnect '" + card.Adapter.Name + "' from its current Wi-Fi network? Other adapters will remain connected.",
             "Disconnect this adapter", MessageBoxButton.YesNo, MessageBoxImage.Warning);
         if (answer != MessageBoxResult.Yes) return;
-
         card.IsBusy = true;
         card.ConnectButton.IsEnabled = false;
         card.DisconnectButton.IsEnabled = false;
@@ -931,7 +914,7 @@ public partial class MainWindow : Window
         {
             SavedPasswordHidden.Password = profile.Password;
             SavedPasswordVisible.Text = profile.Password;
-            SavedPasswordStatus.Text = "Password read from the Windows WLAN profile. It is hidden by default.";
+            SavedPasswordStatus.Text = "Password read from the Windows WLAN profile. Hidden by default.";
         }
         else if (profile.PasswordIsProtected)
             SavedPasswordStatus.Text = "Windows returned an encrypted key. Run InfraLap as Administrator to request plain-text access.";
@@ -946,7 +929,8 @@ public partial class MainWindow : Window
         if (_selectedSavedProfile.Password is null)
         {
             if (_selectedSavedProfile.PasswordIsProtected) OfferAdministratorRestart();
-            else MessageBox.Show(SavedPasswordStatus.Text, "Saved Wi-Fi password", MessageBoxButton.OK, MessageBoxImage.Information);
+            else MessageBox.Show(SavedPasswordStatus.Text, "Saved Wi-Fi password",
+                MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         if (SavedPasswordVisible.Visibility == Visibility.Visible)
@@ -1003,10 +987,10 @@ public partial class MainWindow : Window
             return;
         }
         SetCardSsid(card, profile.Ssid);
-        card.PasswordInput.Password = profile.Password;
-        card.PlainPasswordInput.Text = profile.Password;
-        card.PasswordInput.Visibility = Visibility.Visible;
-        card.PlainPasswordInput.Visibility = Visibility.Collapsed;
+        card.PasswordBox.Password = profile.Password;
+        card.PlainPasswordBox.Text = profile.Password;
+        card.PasswordBox.Visibility = Visibility.Visible;
+        card.PlainPasswordBox.Visibility = Visibility.Collapsed;
         card.TogglePasswordButton.Content = "Show password";
         SetCardStatus(card, "Saved profile '" + profile.Ssid + "' loaded. Press Connect on this adapter card.", BlueBrush);
         StatusText.Text = "Loaded saved profile '" + profile.Ssid + "' into " + target.Name + ".";
@@ -1069,7 +1053,6 @@ public partial class MainWindow : Window
                     .AppendLine().AppendLine("=== Nearby networks ===").AppendLine(networks.CombinedOutput);
                 return builder.ToString();
             });
-
             var dialog = new SaveFileDialog
             {
                 Title = "Save InfraLap MultiWiFi diagnostics",

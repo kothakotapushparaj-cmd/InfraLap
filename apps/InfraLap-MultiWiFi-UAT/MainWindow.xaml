@@ -91,10 +91,8 @@
         </Style>
         <DataTemplate x:Key="NetworkItemTemplate">
             <StackPanel Margin="3,2">
-                <TextBlock Text="{Binding Ssid}" Foreground="#172338"
-                           FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                <TextBlock Text="{Binding DetailText}" Foreground="#52647D"
-                           FontSize="9" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                <TextBlock Text="{Binding Ssid}" Foreground="#172338" FontSize="11" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding DetailText}" Foreground="#52647D" FontSize="9" Margin="0,2,0,0"/>
             </StackPanel>
         </DataTemplate>
     </Window.Resources>
@@ -106,6 +104,7 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
+
         <Grid Grid.Row="0" Margin="0,0,0,16">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
             <StackPanel VerticalAlignment="Center">
@@ -118,8 +117,8 @@
                     CornerRadius="9" Padding="13,9" VerticalAlignment="Center">
                 <StackPanel>
                     <TextBlock Text="BUILD" Foreground="#98E0C2" FontSize="8" FontWeight="Bold" HorizontalAlignment="Center"/>
-                    <TextBlock Text="1.1 · MULTI-ADAPTER" Foreground="#D0F5E5" FontSize="10"
-                               FontWeight="Bold" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                    <TextBlock Text="1.1 · MULTI-ADAPTER" Foreground="#D0F5E5" FontSize="10" FontWeight="Bold"
+                               Margin="0,3,0,0" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Border>
         </Grid>
@@ -207,7 +206,7 @@
                             <TextBlock Text="Adapter inventory" FontSize="15" FontWeight="Bold" Margin="0,3,0,8"/>
                             <TextBlock x:Name="HardwareStatus" Text="Waiting for Windows wireless interfaces..."
                                        Foreground="#C9D7E9" FontSize="10" TextWrapping="Wrap" TextTrimming="None"/>
-                            <TextBlock Text="A USB hub adds ports, not Wi-Fi radios. Each additional compatible USB Wi-Fi adapter should appear as another interface."
+                            <TextBlock Text="A USB hub adds ports, not Wi-Fi radios. Each compatible USB Wi-Fi adapter should appear as another interface."
                                        Foreground="{StaticResource MutedBrush}" FontSize="9" TextWrapping="Wrap"
                                        TextTrimming="None" Margin="0,10,0,0"/>
                         </StackPanel>
@@ -287,7 +286,6 @@
                         </Grid>
                     </Grid>
                 </Border>
-
                 <TextBlock Text="InfraLap MultiWiFi · Windows 11 x64 · Separate physical WLAN interfaces · No bandwidth bonding"
                            Foreground="#71839C" FontSize="8" HorizontalAlignment="Center" Margin="0,7,0,9"/>
             </StackPanel>
