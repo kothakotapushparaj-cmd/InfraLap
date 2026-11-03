@@ -1,0 +1,91 @@
+name: InfraLap MultiWiFi Windows Installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - multiwifi-v1.2.1-build
+    paths:
+      - 'MultiWiFi/BUILD-TRIGGER.txt'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout build branch
+        uses: actions/checkout@v4
+
+      - name: Reconstruct source ZIP from verified payload parts
+        shell: pwsh
+        run: |
+          $partsDir = Join-Path $env:GITHUB_WORKSPACE 'MultiWiFi/v1.2.1-payload'
+          $parts = @(Get-ChildItem $partsDir -Filter 'part-*.b64' | Sort-Object Name)
+          if ($parts.Count -ne 25) {
+            throw "Expected 25 source payload parts; found $($parts.Count)."
+          }
+          $encoded = [System.Text.StringBuilder]::new()
+          foreach ($part in $parts) {
+            [void]$encoded.Append((Get-Content -LiteralPath $part.FullName -Raw).Trim())
+          }
+          $archive = Join-Path $env:RUNNER_TEMP 'InfraLap-MultiWiFi-v1.2.1-source.zip'
+          [System.IO.File]::WriteAllBytes($archive, [Convert]::FromBase64String($encoded.ToString()))
+          $sourceRoot = Join-Path $env:RUNNER_TEMP 'infralap-multiwifi-source'
+          New-Item -ItemType Directory -Force -Path $sourceRoot | Out-Null
+          Expand-Archive -Path $archive -DestinationPath $sourceRoot -Force
+          $project = Get-ChildItem $sourceRoot -Filter 'InfraLap.MultiWiFi.App.csproj' -Recurse | Select-Object -First 1
+          if (!$project) { throw 'InfraLap.MultiWiFi.App.csproj was not found in source ZIP.' }
+          $installer = Get-ChildItem $sourceRoot -Filter 'InfraLap-MultiWiFi.iss' -Recurse | Select-Object -First 1
+          if (!$installer) { throw 'InfraLap-MultiWiFi.iss was not found in source ZIP.' }
+          "PROJECT_FILE=$($project.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "PROJECT_DIR=$($project.Directory.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "INSTALLER_SCRIPT=$($installer.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Set up .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $candidates = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+            "${env:ProgramFiles(x86)}\Inno Setup 7\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 7\ISCC.exe"
+          )
+          $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (!$iscc) { throw 'Inno Setup compiler not found.' }
+          "ISCC_PATH=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Publish Windows x64 application
+        shell: pwsh
+        run: |
+          $publish = Join-Path $env:PROJECT_DIR 'publish\win-x64'
+          dotnet publish $env:PROJECT_FILE -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o $publish
+          if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE." }
+          $appExe = Join-Path $publish 'InfraLap.MultiWiFi.exe'
+          if (!(Test-Path $appExe)) { throw 'Published application EXE was not produced.' }
+
+      - name: Build Setup.exe
+        shell: pwsh
+        run: |
+          & $env:ISCC_PATH $env:INSTALLER_SCRIPT
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE." }
+          $projectRoot = Split-Path (Split-Path $env:INSTALLER_SCRIPT -Parent) -Parent
+          $setup = Join-Path $projectRoot 'installer-output\InfraLap-MultiWiFi-Setup-x64.exe'
+          if (!(Test-Path $setup)) { throw "Expected installer was not generated: $setup" }
+          if ((Get-Item $setup).Length -lt 1MB) { throw 'Generated installer is unexpectedly small.' }
+          "SETUP_EXE=$setup" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: InfraLap-MultiWiFi-Setup-v1.2.1-x64
+          path: ${{ env.SETUP_EXE }}
+          if-no-files-found: error
+          retention-days: 30
