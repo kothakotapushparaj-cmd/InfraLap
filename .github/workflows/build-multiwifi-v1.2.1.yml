@@ -8,7 +8,7 @@ on:
     paths:
       - 'MultiWiFi/InfraLap-MultiWiFi-v1.2.1-source.zip'
       - 'MultiWiFi/InfraLap-MultiWiFi-v1.2.1-build-source.zip.b64'
-      - 'MultiWiFi/InfraLap-MultiWiFi-v1.2.1-build-source.part8.b64'
+      - 'MultiWiFi/InfraLap-MultiWiFi-v1.2.1-build-source.part6.b64'
 
 permissions:
   contents: read
@@ -30,7 +30,7 @@ jobs:
             [IO.File]::WriteAllBytes($archive, [Convert]::FromBase64String($encoded))
           }
           if (!(Test-Path $archive)) {
-            $parts = 1..8 | ForEach-Object { Join-Path $env:GITHUB_WORKSPACE ("MultiWiFi/InfraLap-MultiWiFi-v1.2.1-build-source.part{0}.b64" -f $_) }
+            $parts = 1..6 | ForEach-Object { Join-Path $env:GITHUB_WORKSPACE ("MultiWiFi/InfraLap-MultiWiFi-v1.2.1-build-source.part{0}.b64" -f $_) }
             if (@($parts | Where-Object { !(Test-Path $_) }).Count -eq 0) {
               $encoded = [string]::Concat(@($parts | ForEach-Object { (Get-Content -Raw -Path $_).Trim() }))
               [IO.File]::WriteAllBytes($archive, [Convert]::FromBase64String($encoded))
