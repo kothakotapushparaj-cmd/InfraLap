@@ -1,94 +1,80 @@
 <Window x:Class="InfraLap.MultiWiFi.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="MultiWiFi Control Center" Height="980" Width="1440"
-        MinHeight="780" MinWidth="1120"
-        Background="#0A1020" WindowStartupLocation="CenterScreen"
-        FontFamily="Segoe UI" SnapsToDevicePixels="True"
-        UseLayoutRounding="True">
+        Title="InfraLap MultiWiFi — Adapter Control Center"
+        Height="1040" Width="1460" MinHeight="820" MinWidth="1120"
+        Background="#09111F" WindowStartupLocation="CenterScreen"
+        FontFamily="Segoe UI" UseLayoutRounding="True" SnapsToDevicePixels="True">
     <Window.Resources>
-        <SolidColorBrush x:Key="AppBackground" Color="#0A1020"/>
-        <SolidColorBrush x:Key="PanelBrush" Color="#111C2F"/>
-        <SolidColorBrush x:Key="PanelAltBrush" Color="#16243A"/>
-        <SolidColorBrush x:Key="InputBrush" Color="#0D1728"/>
-        <SolidColorBrush x:Key="LineBrush" Color="#293B56"/>
-        <SolidColorBrush x:Key="TextBrush" Color="#EAF1FC"/>
-        <SolidColorBrush x:Key="MutedBrush" Color="#91A3BC"/>
-        <SolidColorBrush x:Key="AccentBrush" Color="#5595FF"/>
-        <SolidColorBrush x:Key="GreenBrush" Color="#53D6A1"/>
-        <SolidColorBrush x:Key="AmberBrush" Color="#F2B96B"/>
-
+        <SolidColorBrush x:Key="PanelBrush" Color="#111E31"/>
+        <SolidColorBrush x:Key="InputBrush" Color="#0B1728"/>
+        <SolidColorBrush x:Key="LineBrush" Color="#293D59"/>
+        <SolidColorBrush x:Key="TextBrush" Color="#EDF3FC"/>
+        <SolidColorBrush x:Key="MutedBrush" Color="#91A3BB"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="#5797FF"/>
+        <SolidColorBrush x:Key="GreenBrush" Color="#54D6A2"/>
+        <SolidColorBrush x:Key="AmberBrush" Color="#F0B86A"/>
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
             <Setter Property="FontFamily" Value="Segoe UI"/>
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
-
         <Style TargetType="Button">
             <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
-            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="Foreground" Value="White"/>
             <Setter Property="Padding" Value="14,9"/>
             <Setter Property="Margin" Value="0,0,8,0"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontSize" Value="11"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="MinHeight" Value="34"/>
         </Style>
         <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Background" Value="#23334D"/>
-            <Setter Property="BorderBrush" Value="#344A69"/>
+            <Setter Property="Background" Value="#233650"/>
+            <Setter Property="BorderBrush" Value="#385372"/>
             <Setter Property="BorderThickness" Value="1"/>
         </Style>
         <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Background" Value="#A94355"/>
+            <Setter Property="Background" Value="#873D4C"/>
         </Style>
-        <Style x:Key="WarningButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Background" Value="#77572B"/>
-            <Setter Property="BorderBrush" Value="#A67B3E"/>
-            <Setter Property="BorderThickness" Value="1"/>
-        </Style>
-
         <Style TargetType="TextBox">
             <Setter Property="Background" Value="{StaticResource InputBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-            <Setter Property="BorderBrush" Value="#344A69"/>
+            <Setter Property="BorderBrush" Value="#344B6A"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="10,8"/>
             <Setter Property="CaretBrush" Value="White"/>
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontSize" Value="11"/>
         </Style>
         <Style TargetType="PasswordBox">
             <Setter Property="Background" Value="{StaticResource InputBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-            <Setter Property="BorderBrush" Value="#344A69"/>
+            <Setter Property="BorderBrush" Value="#344B6A"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="10,8"/>
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontSize" Value="11"/>
         </Style>
         <Style TargetType="ComboBox">
             <Setter Property="Background" Value="{StaticResource InputBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-            <Setter Property="BorderBrush" Value="#344A69"/>
+            <Setter Property="BorderBrush" Value="#344B6A"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="8,6"/>
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontSize" Value="11"/>
             <Setter Property="ItemContainerStyle">
                 <Setter.Value>
                     <Style TargetType="ComboBoxItem">
                         <Setter Property="Foreground" Value="#172338"/>
                         <Setter Property="Background" Value="#FFFFFF"/>
-                        <Setter Property="Padding" Value="10,8"/>
+                        <Setter Property="Padding" Value="9,7"/>
                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                        <Setter Property="BorderThickness" Value="0"/>
                         <Style.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
                                 <Setter Property="Background" Value="#DCEBFF"/>
-                                <Setter Property="Foreground" Value="#14243B"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter Property="Background" Value="#C7DCFA"/>
-                                <Setter Property="Foreground" Value="#14243B"/>
                             </Trigger>
                         </Style.Triggers>
                     </Style>
@@ -96,14 +82,21 @@
             </Setter>
         </Style>
         <Style TargetType="DataGridColumnHeader">
-            <Setter Property="Background" Value="#1B2B43"/>
-            <Setter Property="Foreground" Value="#BDD0E9"/>
+            <Setter Property="Background" Value="#1B2D46"/>
+            <Setter Property="Foreground" Value="#C9D8EC"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Padding" Value="10,9"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Padding" Value="9,8"/>
             <Setter Property="BorderBrush" Value="#344A69"/>
-            <Setter Property="BorderThickness" Value="0,0,0,1"/>
         </Style>
+        <DataTemplate x:Key="NetworkItemTemplate">
+            <StackPanel Margin="3,2">
+                <TextBlock Text="{Binding Ssid}" Foreground="#172338"
+                           FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                <TextBlock Text="{Binding DetailText}" Foreground="#52647D"
+                           FontSize="9" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+        </DataTemplate>
     </Window.Resources>
 
     <Grid Margin="22">
@@ -113,459 +106,202 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-
-        <!-- Header: text-only by design; no logo or brand mark. -->
-        <Grid Grid.Row="0" Margin="0,0,0,18">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                <TextBlock Text="WIRELESS NETWORK CONTROL" Foreground="#75A9FF"
-                           FontSize="10" FontWeight="Bold"/>
-                <TextBlock Text="MultiWiFi Control Center" FontSize="29"
-                           FontWeight="Bold" Margin="0,4,0,0"/>
-                <TextBlock Text="Manage adapters, connect to separate networks, inspect saved profiles and export diagnostics."
-                           Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,4,0,0"
-                           TextTrimming="None"/>
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="WIRELESS NETWORK CONTROL" Foreground="#80B1FF" FontSize="9" FontWeight="Bold"/>
+                <TextBlock Text="MultiWiFi Adapter Control Center" FontSize="27" FontWeight="Bold" Margin="0,4,0,0"/>
+                <TextBlock Text="Detect every Windows Wi-Fi interface. Assign a network to each physical adapter and manage connections independently."
+                           Foreground="{StaticResource MutedBrush}" FontSize="11" TextTrimming="None" Margin="0,4,0,0"/>
             </StackPanel>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <Border Background="#172943" BorderBrush="#2D4A70" BorderThickness="1"
-                        CornerRadius="8" Padding="12,8" Margin="0,0,8,0">
-                    <StackPanel>
-                        <TextBlock Text="WINDOWS WLAN" Foreground="#AFC8EA"
-                                   FontSize="9" FontWeight="Bold" HorizontalAlignment="Center"/>
-                        <TextBlock Text="NATIVE CONTROL" Foreground="#EAF1FC"
-                                   FontSize="11" FontWeight="Bold" Margin="0,3,0,0"
-                                   HorizontalAlignment="Center"/>
-                    </StackPanel>
-                </Border>
-                <Border Background="#17362F" BorderBrush="#2D7059" BorderThickness="1"
-                        CornerRadius="8" Padding="12,8">
-                    <StackPanel>
-                        <TextBlock Text="RELEASE" Foreground="#92DCC0"
-                                   FontSize="9" FontWeight="Bold" HorizontalAlignment="Center"/>
-                        <TextBlock Text="UI 1.0" Foreground="#C2F4DF"
-                                   FontSize="11" FontWeight="Bold" Margin="0,3,0,0"
-                                   HorizontalAlignment="Center"/>
-                    </StackPanel>
-                </Border>
-            </StackPanel>
+            <Border Grid.Column="1" Background="#17362F" BorderBrush="#2A7057" BorderThickness="1"
+                    CornerRadius="9" Padding="13,9" VerticalAlignment="Center">
+                <StackPanel>
+                    <TextBlock Text="BUILD" Foreground="#98E0C2" FontSize="8" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="1.1 · MULTI-ADAPTER" Foreground="#D0F5E5" FontSize="10"
+                               FontWeight="Bold" Margin="0,3,0,0" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
         </Grid>
 
-        <!-- Main action toolbar -->
-        <Border Grid.Row="1" Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource LineBrush}" BorderThickness="1"
-                CornerRadius="12" Padding="12" Margin="0,0,0,16">
+        <Border Grid.Row="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}"
+                BorderThickness="1" CornerRadius="11" Padding="11" Margin="0,0,0,15">
             <DockPanel LastChildFill="False">
                 <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Width="5" Height="26" Background="{StaticResource AccentBrush}"
-                            CornerRadius="3" Margin="0,0,12,0"/>
+                    <Border Width="4" Height="25" Background="{StaticResource AccentBrush}" CornerRadius="2" Margin="0,0,11,0"/>
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="QUICK ACTIONS" FontSize="10" FontWeight="Bold"
-                                   Foreground="{StaticResource MutedBrush}"/>
-                        <TextBlock Text="Wireless workspace" FontSize="12" FontWeight="SemiBold"
-                                   Margin="0,2,0,0"/>
+                        <TextBlock Text="QUICK ACTIONS" Foreground="{StaticResource MutedBrush}" FontSize="8" FontWeight="Bold"/>
+                        <TextBlock Text="Adapter and network tools" FontSize="11" FontWeight="SemiBold" Margin="0,2,0,0"/>
                     </StackPanel>
                 </StackPanel>
                 <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Center">
                     <Button Content="Refresh adapters" Click="Refresh_Click"/>
                     <Button Content="Scan networks" Click="Scan_Click" Style="{StaticResource SecondaryButton}"/>
-                    <Button Content="Saved profiles" Click="SavedProfiles_Click" Style="{StaticResource SecondaryButton}"/>
+                    <Button Content="Refresh saved profiles" Click="SavedProfiles_Click" Style="{StaticResource SecondaryButton}"/>
                     <Button Content="Export diagnostics" Click="Export_Click" Style="{StaticResource SecondaryButton}" Margin="0"/>
                 </WrapPanel>
             </DockPanel>
         </Border>
 
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,4">
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,4">
             <StackPanel>
-                <!-- Orientation / safety summary -->
-                <Grid Margin="0,0,0,16">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" Background="{StaticResource PanelBrush}"
-                            BorderBrush="{StaticResource LineBrush}" BorderThickness="1"
-                            CornerRadius="11" Padding="14" Margin="0,0,8,0">
+                <Grid Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}"
+                            BorderThickness="1" CornerRadius="10" Padding="13" Margin="0,0,7,0">
                         <StackPanel>
-                            <TextBlock Text="01  CONNECTION SLOTS" Foreground="#80AEFF"
-                                       FontSize="9" FontWeight="Bold"/>
-                            <TextBlock Text="Two independent profiles" FontSize="14"
-                                       FontWeight="SemiBold" Margin="0,5,0,2"/>
-                            <TextBlock Text="Assign each profile to a separate physical Wi-Fi adapter for simultaneous links."
-                                       Foreground="{StaticResource MutedBrush}" FontSize="10"
-                                       TextWrapping="Wrap" TextTrimming="None"/>
+                            <TextBlock Text="WI-FI ADAPTERS DETECTED" Foreground="#80B1FF" FontSize="8" FontWeight="Bold"/>
+                            <TextBlock x:Name="AdapterCountText" Text="0" FontSize="23" FontWeight="Bold" Margin="0,3,0,0"/>
+                            <TextBlock Text="Each detected interface gets its own connection card." Foreground="{StaticResource MutedBrush}"
+                                       FontSize="9" TextWrapping="Wrap" TextTrimming="None"/>
                         </StackPanel>
                     </Border>
-                    <Border Grid.Column="1" Background="{StaticResource PanelBrush}"
-                            BorderBrush="{StaticResource LineBrush}" BorderThickness="1"
-                            CornerRadius="11" Padding="14" Margin="4,0,4,0">
+                    <Border Grid.Column="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}"
+                            BorderThickness="1" CornerRadius="10" Padding="13" Margin="4,0,4,0">
                         <StackPanel>
-                            <TextBlock Text="02  ADAPTER TARGETING" Foreground="#63D6C0"
-                                       FontSize="9" FontWeight="Bold"/>
-                            <TextBlock Text="Choose the exact interface" FontSize="14"
-                                       FontWeight="SemiBold" Margin="0,5,0,2"/>
-                            <TextBlock Text="Each connection is sent to the selected Windows WLAN interface."
-                                       Foreground="{StaticResource MutedBrush}" FontSize="10"
-                                       TextWrapping="Wrap" TextTrimming="None"/>
+                            <TextBlock Text="ACTIVE WI-FI LINKS" Foreground="#63D8B4" FontSize="8" FontWeight="Bold"/>
+                            <TextBlock x:Name="ConnectedCountText" Text="0" FontSize="23" FontWeight="Bold" Margin="0,3,0,0"/>
+                            <TextBlock Text="Connected status is read back from Windows." Foreground="{StaticResource MutedBrush}"
+                                       FontSize="9" TextWrapping="Wrap" TextTrimming="None"/>
                         </StackPanel>
                     </Border>
-                    <Border Grid.Column="2" Background="{StaticResource PanelBrush}"
-                            BorderBrush="{StaticResource LineBrush}" BorderThickness="1"
-                            CornerRadius="11" Padding="14" Margin="8,0,0,0">
+                    <Border Grid.Column="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}"
+                            BorderThickness="1" CornerRadius="10" Padding="13" Margin="7,0,0,0">
                         <StackPanel>
-                            <TextBlock Text="03  LOCAL CREDENTIALS" Foreground="#E2B36F"
-                                       FontSize="9" FontWeight="Bold"/>
-                            <TextBlock Text="Privacy-first handling" FontSize="14"
-                                       FontWeight="SemiBold" Margin="0,5,0,2"/>
-                            <TextBlock Text="Connection passwords are not written to app diagnostics or exported reports."
-                                       Foreground="{StaticResource MutedBrush}" FontSize="10"
-                                       TextWrapping="Wrap" TextTrimming="None"/>
+                            <TextBlock Text="SAVED WI-FI PROFILES" Foreground="#E5B873" FontSize="8" FontWeight="Bold"/>
+                            <TextBlock x:Name="SavedProfilesCountText" Text="0" FontSize="23" FontWeight="Bold" Margin="0,3,0,0"/>
+                            <TextBlock Text="Stored by Windows for the current device." Foreground="{StaticResource MutedBrush}"
+                                       FontSize="9" TextWrapping="Wrap" TextTrimming="None"/>
                         </StackPanel>
                     </Border>
                 </Grid>
 
-                <!-- Connection workspace and live hardware / scan panels -->
-                <Grid Margin="0,0,0,16">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1.55*"/>
-                        <ColumnDefinition Width="1*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <Grid Grid.Column="0" Margin="0,0,8,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Connection 1 -->
-                        <Border Grid.Column="0" Background="{StaticResource PanelBrush}"
-                                BorderBrush="#31517D" BorderThickness="1" CornerRadius="13"
-                                Padding="16" Margin="0,0,7,0">
+                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1"
+                        CornerRadius="12" Padding="14" Margin="0,0,0,14">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,7">
                             <StackPanel>
-                                <DockPanel Margin="0,0,0,14">
-                                    <StackPanel>
-                                        <TextBlock Text="LINK 01  /  PRIMARY" Foreground="#80AEFF"
-                                                   FontSize="9" FontWeight="Bold"/>
-                                        <TextBlock Text="Connection One" FontSize="18"
-                                                   FontWeight="Bold" Margin="0,4,0,0"/>
-                                    </StackPanel>
-                                    <Border DockPanel.Dock="Right" Background="#1C3456"
-                                            CornerRadius="6" Padding="8,5" VerticalAlignment="Center">
-                                        <TextBlock Text="PROFILE 01" Foreground="#C6DCFF"
-                                                   FontSize="9" FontWeight="Bold"/>
-                                    </Border>
-                                </DockPanel>
-
-                                <TextBlock Text="TARGET WI-FI ADAPTER" Foreground="{StaticResource MutedBrush}"
-                                           FontSize="9" FontWeight="Bold" Margin="0,0,0,5"/>
-                                <ComboBox x:Name="Connection1Adapter" Height="38"
-                                          DisplayMemberPath="DisplayText" Margin="0,0,0,12"/>
-
-                                <TextBlock Text="NETWORK NAME  /  SSID" Foreground="{StaticResource MutedBrush}"
-                                           FontSize="9" FontWeight="Bold" Margin="0,0,0,5"/>
-                                <ComboBox x:Name="Connection1Ssid" Height="42" IsEditable="True"
-                                          IsTextSearchEnabled="True" TextSearch.TextPath="Ssid"
-                                          StaysOpenOnEdit="False" Margin="0,0,0,12"
-                                          ToolTip="Select a scanned network or type a hidden SSID manually">
-                                    <ComboBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Margin="3,2">
-                                                <TextBlock Text="{Binding Ssid}" Foreground="#172338"
-                                                           FontSize="12" FontWeight="SemiBold"
-                                                           TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Text="{Binding DetailText}" Foreground="#52647D"
-                                                           FontSize="10" Margin="0,2,0,0"
-                                                           TextTrimming="CharacterEllipsis"/>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
-
-                                <TextBlock Text="WPA2-PERSONAL PASSWORD" Foreground="{StaticResource MutedBrush}"
-                                           FontSize="9" FontWeight="Bold" Margin="0,0,0,5"/>
-                                <PasswordBox x:Name="Connection1Password" Height="38" Margin="0,0,0,12"/>
-
-                                <WrapPanel Margin="0,0,0,12">
-                                    <Button Content="Connect" Click="Connect1_Click" MinWidth="92"/>
-                                    <Button Content="Disconnect" Click="Disconnect1_Click"
-                                            Style="{StaticResource DangerButton}" Margin="0"/>
-                                </WrapPanel>
-
-                                <Border Background="#0D1728" BorderBrush="#293B56"
-                                        BorderThickness="1" CornerRadius="8" Padding="10">
-                                    <StackPanel>
-                                        <TextBlock Text="LINK STATUS" Foreground="{StaticResource MutedBrush}"
-                                                   FontSize="9" FontWeight="Bold"/>
-                                        <TextBlock x:Name="Connection1Status" Text="Not connected"
-                                                   FontSize="11" TextWrapping="Wrap" TextTrimming="None"
-                                                   Margin="0,5,0,0"/>
-                                    </StackPanel>
-                                </Border>
+                                <TextBlock Text="PHYSICAL WI-FI INTERFACES" Foreground="#80B1FF" FontSize="8" FontWeight="Bold"/>
+                                <TextBlock Text="One connection workspace per adapter" FontSize="17" FontWeight="Bold" Margin="0,3,0,0"/>
                             </StackPanel>
-                        </Border>
-
-                        <!-- Connection 2 -->
-                        <Border Grid.Column="1" Background="{StaticResource PanelBrush}"
-                                BorderBrush="#286052" BorderThickness="1" CornerRadius="13"
-                                Padding="16" Margin="7,0,0,0">
-                            <StackPanel>
-                                <DockPanel Margin="0,0,0,14">
-                                    <StackPanel>
-                                        <TextBlock Text="LINK 02  /  SECONDARY" Foreground="#65D9B5"
-                                                   FontSize="9" FontWeight="Bold"/>
-                                        <TextBlock Text="Connection Two" FontSize="18"
-                                                   FontWeight="Bold" Margin="0,4,0,0"/>
-                                    </StackPanel>
-                                    <Border DockPanel.Dock="Right" Background="#173B34"
-                                            CornerRadius="6" Padding="8,5" VerticalAlignment="Center">
-                                        <TextBlock Text="PROFILE 02" Foreground="#B9F0DB"
-                                                   FontSize="9" FontWeight="Bold"/>
-                                    </Border>
-                                </DockPanel>
-
-                                <TextBlock Text="TARGET WI-FI ADAPTER" Foreground="{StaticResource MutedBrush}"
-                                           FontSize="9" FontWeight="Bold" Margin="0,0,0,5"/>
-                                <ComboBox x:Name="Connection2Adapter" Height="38"
-                                          DisplayMemberPath="DisplayText" Margin="0,0,0,12"/>
-
-                                <TextBlock Text="NETWORK NAME  /  SSID" Foreground="{StaticResource MutedBrush}"
-                                           FontSize="9" FontWeight="Bold" Margin="0,0,0,5"/>
-                                <ComboBox x:Name="Connection2Ssid" Height="42" IsEditable="True"
-                                          IsTextSearchEnabled="True" TextSearch.TextPath="Ssid"
-                                          StaysOpenOnEdit="False" Margin="0,0,0,12"
-                                          ToolTip="Select a scanned network or type a hidden SSID manually">
-                                    <ComboBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Margin="3,2">
-                                                <TextBlock Text="{Binding Ssid}" Foreground="#172338"
-                                                           FontSize="12" FontWeight="SemiBold"
-                                                           TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Text="{Binding DetailText}" Foreground="#52647D"
-                                                           FontSize="10" Margin="0,2,0,0"
-                                                           TextTrimming="CharacterEllipsis"/>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
-
-                                <TextBlock Text="WPA2-PERSONAL PASSWORD" Foreground="{StaticResource MutedBrush}"
-                                           FontSize="9" FontWeight="Bold" Margin="0,0,0,5"/>
-                                <PasswordBox x:Name="Connection2Password" Height="38" Margin="0,0,0,12"/>
-
-                                <WrapPanel Margin="0,0,0,7">
-                                    <Button Content="Connect" Click="Connect2_Click" MinWidth="92"/>
-                                    <Button Content="Disconnect" Click="Disconnect2_Click"
-                                            Style="{StaticResource DangerButton}" Margin="0"/>
-                                </WrapPanel>
-                                <WrapPanel Margin="0,0,0,12">
-                                    <Button Content="Try same-adapter (experimental)"
-                                            Click="TrySecondarySta_Click"
-                                            Style="{StaticResource WarningButton}"/>
-                                    <Button Content="Stop secondary STA" Click="StopSecondarySta_Click"
-                                            Style="{StaticResource SecondaryButton}" Margin="0"/>
-                                </WrapPanel>
-
-                                <Border Background="#0D1728" BorderBrush="#293B56"
-                                        BorderThickness="1" CornerRadius="8" Padding="10">
-                                    <StackPanel>
-                                        <TextBlock Text="LINK STATUS" Foreground="{StaticResource MutedBrush}"
-                                                   FontSize="9" FontWeight="Bold"/>
-                                        <TextBlock x:Name="Connection2Status" Text="Not connected"
-                                                   FontSize="11" TextWrapping="Wrap" TextTrimming="None"
-                                                   Margin="0,5,0,0"/>
-                                    </StackPanel>
-                                </Border>
-                                <TextBlock Text="Independent simultaneous links require two physical adapters. The secondary-STA test is driver-dependent."
-                                           Foreground="{StaticResource MutedBrush}" FontSize="9"
-                                           TextWrapping="Wrap" TextTrimming="None" Margin="0,10,0,0"/>
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-
-                    <!-- Right side panels -->
-                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                        <Border Background="{StaticResource PanelBrush}"
-                                BorderBrush="{StaticResource LineBrush}" BorderThickness="1"
-                                CornerRadius="13" Padding="15" Margin="0,0,0,12">
-                            <StackPanel>
-                                <DockPanel Margin="0,0,0,9">
-                                    <StackPanel>
-                                        <TextBlock Text="HARDWARE INVENTORY" Foreground="#80AEFF"
-                                                   FontSize="9" FontWeight="Bold"/>
-                                        <TextBlock Text="Adapter readiness" FontSize="16"
-                                                   FontWeight="Bold" Margin="0,3,0,0"/>
-                                    </StackPanel>
-                                    <Border DockPanel.Dock="Right" Background="#1D304B"
-                                            CornerRadius="6" Padding="7,4">
-                                        <TextBlock Text="LIVE" Foreground="#BFD5F5"
-                                                   FontSize="9" FontWeight="Bold"/>
-                                    </Border>
-                                </DockPanel>
-                                <TextBlock x:Name="HardwareStatus" Text="Checking wireless adapters..."
-                                           Foreground="#C4D2E5" FontSize="11"
-                                           TextWrapping="Wrap" TextTrimming="None"/>
-                                <Border Background="#0D1728" CornerRadius="7" Padding="9"
-                                        Margin="0,10,0,0">
-                                    <TextBlock Text="Tip: identical adapter models can still be selected as separate Windows interfaces when each device is detected separately."
-                                               Foreground="{StaticResource MutedBrush}" FontSize="9"
-                                               TextWrapping="Wrap" TextTrimming="None"/>
-                                </Border>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Background="{StaticResource PanelBrush}"
-                                BorderBrush="{StaticResource LineBrush}" BorderThickness="1"
-                                CornerRadius="13" Padding="15">
-                            <StackPanel>
-                                <DockPanel Margin="0,0,0,9">
-                                    <StackPanel>
-                                        <TextBlock Text="RADIO ENVIRONMENT" Foreground="#65D9B5"
-                                                   FontSize="9" FontWeight="Bold"/>
-                                        <TextBlock Text="Nearby Wi-Fi networks" FontSize="16"
-                                                   FontWeight="Bold" Margin="0,3,0,0"/>
-                                    </StackPanel>
-                                    <TextBlock Text="SCAN RESULTS" Foreground="{StaticResource MutedBrush}"
-                                               FontSize="8" FontWeight="Bold"
-                                               VerticalAlignment="Center"/>
-                                </DockPanel>
-                                <TextBox x:Name="NetworksOutput" IsReadOnly="True" AcceptsReturn="True"
-                                         TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
-                                         HorizontalScrollBarVisibility="Auto" FontFamily="Consolas"
-                                         FontSize="10" Background="#0D1728" BorderBrush="#293B56"
-                                         BorderThickness="1" Height="190"/>
-                                <TextBlock Text="Use Scan networks above to refresh the available SSIDs. Select a network from either connection dropdown."
-                                           Foreground="{StaticResource MutedBrush}" FontSize="9"
-                                           TextWrapping="Wrap" TextTrimming="None" Margin="0,8,0,0"/>
-                            </StackPanel>
-                        </Border>
+                            <Border DockPanel.Dock="Right" Background="#1B2E48" CornerRadius="7" Padding="8,5" VerticalAlignment="Center">
+                                <TextBlock Text="DYNAMIC ADAPTER LIST" Foreground="#C3D7F0" FontSize="8" FontWeight="Bold"/>
+                            </Border>
+                        </DockPanel>
+                        <TextBlock Text="Identical adapter models are distinguished by Windows interface name, MAC address, interface GUID and Plug-and-Play device ID."
+                                   Foreground="{StaticResource MutedBrush}" FontSize="9" TextWrapping="Wrap" TextTrimming="None" Margin="0,0,0,10"/>
+                        <TextBlock x:Name="AdapterEmptyText"
+                                   Text="No WLAN adapters detected yet. Connect your USB Wi-Fi adapter, then select Refresh adapters."
+                                   Foreground="{StaticResource AmberBrush}" FontSize="11" TextWrapping="Wrap" TextTrimming="None"
+                                   Margin="2,6,2,8" Visibility="Visible"/>
+                        <WrapPanel x:Name="AdapterCardsPanel"/>
                     </StackPanel>
-                </Grid>
-
-                <!-- Dual link caveat -->
-                <Border Background="#2B2419" BorderBrush="#74542D" BorderThickness="1"
-                        CornerRadius="10" Padding="11" Margin="0,0,0,16">
-                    <DockPanel>
-                        <TextBlock Text="!" Foreground="#F3C47F" FontSize="17"
-                                   FontWeight="Bold" VerticalAlignment="Center" Margin="2,0,12,0"/>
-                        <StackPanel>
-                            <TextBlock Text="MULTI-ADAPTER MODE" Foreground="#F2C17D"
-                                       FontSize="9" FontWeight="Bold"/>
-                            <TextBlock Text="For two different Wi-Fi networks at the same time, assign Connection One and Connection Two to two separate physical Wi-Fi adapters. Windows Dual-STA is experimental and does not guarantee independent SSIDs."
-                                       Foreground="#E6D6BC" FontSize="10" TextWrapping="Wrap"
-                                       TextTrimming="None" Margin="0,3,0,0"/>
-                        </StackPanel>
-                    </DockPanel>
                 </Border>
 
-                <!-- Saved profiles management -->
-                <Border Background="{StaticResource PanelBrush}"
-                        BorderBrush="{StaticResource LineBrush}" BorderThickness="1"
-                        CornerRadius="13" Padding="16" Margin="0,0,0,8">
+                <Grid Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="1.05*"/><ColumnDefinition Width="1.2*"/></Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}"
+                            BorderThickness="1" CornerRadius="11" Padding="14" Margin="0,0,7,0">
+                        <StackPanel>
+                            <TextBlock Text="HARDWARE READINESS" Foreground="#80B1FF" FontSize="8" FontWeight="Bold"/>
+                            <TextBlock Text="Adapter inventory" FontSize="15" FontWeight="Bold" Margin="0,3,0,8"/>
+                            <TextBlock x:Name="HardwareStatus" Text="Waiting for Windows wireless interfaces..."
+                                       Foreground="#C9D7E9" FontSize="10" TextWrapping="Wrap" TextTrimming="None"/>
+                            <TextBlock Text="A USB hub adds ports, not Wi-Fi radios. Each additional compatible USB Wi-Fi adapter should appear as another interface."
+                                       Foreground="{StaticResource MutedBrush}" FontSize="9" TextWrapping="Wrap"
+                                       TextTrimming="None" Margin="0,10,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}"
+                            BorderThickness="1" CornerRadius="11" Padding="14" Margin="7,0,0,0">
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,7">
+                                <StackPanel>
+                                    <TextBlock Text="WIRELESS ENVIRONMENT" Foreground="#63D8B4" FontSize="8" FontWeight="Bold"/>
+                                    <TextBlock Text="Nearby networks" FontSize="15" FontWeight="Bold" Margin="0,3,0,0"/>
+                                </StackPanel>
+                                <TextBlock Text="SCAN RESULTS" Foreground="{StaticResource MutedBrush}" FontSize="8"
+                                           FontWeight="Bold" VerticalAlignment="Center"/>
+                            </DockPanel>
+                            <TextBox x:Name="NetworksOutput" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                                     FontFamily="Consolas" FontSize="9" Background="{StaticResource InputBrush}"
+                                     BorderBrush="{StaticResource LineBrush}" Height="148"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1"
+                        CornerRadius="12" Padding="14" Margin="0,0,0,12">
                     <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                         <DockPanel Grid.Row="0" Margin="0,0,0,12">
                             <StackPanel>
-                                <TextBlock Text="WINDOWS WLAN PROFILE LIBRARY" Foreground="#80AEFF"
-                                           FontSize="9" FontWeight="Bold"/>
-                                <TextBlock Text="Saved networks &amp; credentials" FontSize="18"
-                                           FontWeight="Bold" Margin="0,3,0,0"/>
-                                <TextBlock Text="Inspect profiles stored by Windows and load a saved WPA2 network into a connection slot."
-                                           Foreground="{StaticResource MutedBrush}" FontSize="10"
-                                           TextWrapping="Wrap" TextTrimming="None" Margin="0,3,0,0"/>
+                                <TextBlock Text="WINDOWS WLAN PROFILE LIBRARY" Foreground="#E5B873" FontSize="8" FontWeight="Bold"/>
+                                <TextBlock Text="Saved networks and credentials" FontSize="17" FontWeight="Bold" Margin="0,3,0,0"/>
+                                <TextBlock Text="Select a saved WPA2 profile and load it into any selected detected adapter."
+                                           Foreground="{StaticResource MutedBrush}" FontSize="9" TextWrapping="Wrap"
+                                           TextTrimming="None" Margin="0,3,0,0"/>
                             </StackPanel>
-                            <Button DockPanel.Dock="Right" Content="Refresh saved profiles"
-                                    Click="SavedProfiles_Click" Style="{StaticResource SecondaryButton}"
-                                    VerticalAlignment="Center" Margin="10,0,0,0"/>
+                            <Button DockPanel.Dock="Right" Content="Reload profiles" Click="SavedProfiles_Click"
+                                    Style="{StaticResource SecondaryButton}" Margin="10,0,0,0" VerticalAlignment="Center"/>
                         </DockPanel>
-
                         <Grid Grid.Row="1">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1.05*"/>
-                                <ColumnDefinition Width="1*"/>
-                            </Grid.ColumnDefinitions>
-                            <DataGrid x:Name="SavedProfilesGrid" Grid.Column="0"
-                                      AutoGenerateColumns="False" IsReadOnly="True"
-                                      SelectionMode="Single" SelectionUnit="FullRow"
-                                      SelectionChanged="SavedProfilesGrid_SelectionChanged"
-                                      Background="#0D1728" Foreground="{StaticResource TextBrush}"
-                                      RowBackground="#142239" AlternatingRowBackground="#192A43"
-                                      BorderBrush="#344A69" HeadersVisibility="Column"
-                                      CanUserAddRows="False" CanUserDeleteRows="False"
-                                      GridLinesVisibility="Horizontal" FontSize="10"
-                                      Height="230" Margin="0,0,10,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="1.05*"/><ColumnDefinition Width="1*"/></Grid.ColumnDefinitions>
+                            <DataGrid x:Name="SavedProfilesGrid" Grid.Column="0" AutoGenerateColumns="False" IsReadOnly="True"
+                                      SelectionMode="Single" SelectionUnit="FullRow" SelectionChanged="SavedProfilesGrid_SelectionChanged"
+                                      Background="{StaticResource InputBrush}" Foreground="{StaticResource TextBrush}"
+                                      RowBackground="#14233A" AlternatingRowBackground="#192B44"
+                                      BorderBrush="{StaticResource LineBrush}" HeadersVisibility="Column"
+                                      CanUserAddRows="False" CanUserDeleteRows="False" GridLinesVisibility="Horizontal"
+                                      FontSize="10" Height="220" Margin="0,0,10,0">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="NETWORK / SSID" Binding="{Binding Ssid}" Width="*"/>
-                                    <DataGridTextColumn Header="ADAPTER" Binding="{Binding AdapterName}" Width="105"/>
-                                    <DataGridTextColumn Header="SECURITY" Binding="{Binding Authentication}" Width="100"/>
+                                    <DataGridTextColumn Header="ADAPTER" Binding="{Binding AdapterName}" Width="110"/>
+                                    <DataGridTextColumn Header="SECURITY" Binding="{Binding Authentication}" Width="95"/>
                                 </DataGrid.Columns>
                             </DataGrid>
-
-                            <Border Grid.Column="1" Background="#0D1728"
-                                    BorderBrush="#293B56" BorderThickness="1"
-                                    CornerRadius="9" Padding="13">
+                            <Border Grid.Column="1" Background="{StaticResource InputBrush}" BorderBrush="{StaticResource LineBrush}"
+                                    BorderThickness="1" CornerRadius="8" Padding="12">
                                 <StackPanel>
-                                    <TextBlock Text="SELECTED PROFILE" Foreground="{StaticResource MutedBrush}"
-                                               FontSize="9" FontWeight="Bold"/>
-                                    <TextBlock x:Name="SavedProfileDetails"
-                                               Text="Select a saved network to view its details."
-                                               FontSize="11" TextWrapping="Wrap" TextTrimming="None"
-                                               Margin="0,7,0,10"/>
-                                    <PasswordBox x:Name="SavedPasswordHidden" Height="36"
-                                                 IsEnabled="True" IsHitTestVisible="False"
-                                                 Focusable="False"
-                                                 ToolTip="Saved password is hidden by default"/>
-                                    <TextBox x:Name="SavedPasswordVisible" Height="36"
-                                             IsReadOnly="True" Visibility="Collapsed"
-                                             Background="{StaticResource InputBrush}"
-                                             Foreground="{StaticResource TextBrush}"
-                                             BorderBrush="#344A69" Padding="10,8"/>
-                                    <WrapPanel Margin="0,9,0,0">
-                                        <Button x:Name="SavedPasswordToggle" Content="Show password"
-                                                Click="ToggleSavedPassword_Click"
-                                                Style="{StaticResource SecondaryButton}"
-                                                IsEnabled="False"/>
-                                        <Button Content="Use in Connection One"
-                                                Click="UseSavedForConnection1_Click"
-                                                Style="{StaticResource SecondaryButton}"/>
-                                        <Button Content="Use in Connection Two"
-                                                Click="UseSavedForConnection2_Click"
+                                    <TextBlock Text="SELECTED PROFILE" Foreground="{StaticResource MutedBrush}" FontSize="8" FontWeight="Bold"/>
+                                    <TextBlock x:Name="SavedProfileDetails" Text="Select a saved network to view its details."
+                                               FontSize="10" TextWrapping="Wrap" TextTrimming="None" Margin="0,7,0,9"/>
+                                    <PasswordBox x:Name="SavedPasswordHidden" Height="34" IsHitTestVisible="False" Focusable="False"/>
+                                    <TextBox x:Name="SavedPasswordVisible" Height="34" IsReadOnly="True" Visibility="Collapsed"/>
+                                    <WrapPanel Margin="0,8,0,0">
+                                        <Button x:Name="SavedPasswordToggle" Content="Show password" Click="ToggleSavedPassword_Click"
+                                                Style="{StaticResource SecondaryButton}" IsEnabled="False"/>
+                                        <Button Content="Load into selected adapter" Click="UseSavedProfile_Click"
                                                 Style="{StaticResource SecondaryButton}" Margin="0"/>
                                     </WrapPanel>
+                                    <TextBlock Text="TARGET ADAPTER" Foreground="{StaticResource MutedBrush}" FontSize="8"
+                                               FontWeight="Bold" Margin="0,10,0,5"/>
+                                    <ComboBox x:Name="SavedTargetAdapter" Height="36" DisplayMemberPath="DisplayText"/>
                                     <TextBlock x:Name="SavedPasswordStatus"
-                                               Text="Passwords are hidden until you request reveal. Windows controls plain-text access."
+                                               Text="Passwords stay hidden until you select Show password. Windows controls plain-text access."
                                                Foreground="{StaticResource MutedBrush}" FontSize="9"
-                                               TextWrapping="Wrap" TextTrimming="None" Margin="0,9,0,0"/>
+                                               TextWrapping="Wrap" TextTrimming="None" Margin="0,8,0,0"/>
                                 </StackPanel>
                             </Border>
                         </Grid>
                     </Grid>
                 </Border>
 
-                <TextBlock Text="InfraLap MultiWiFi · Windows 11 x64 · Interface-level Wi-Fi control · Not a bandwidth-bonding client"
-                           Foreground="#71839C" FontSize="9" HorizontalAlignment="Center"
-                           Margin="0,8,0,10"/>
+                <TextBlock Text="InfraLap MultiWiFi · Windows 11 x64 · Separate physical WLAN interfaces · No bandwidth bonding"
+                           Foreground="#71839C" FontSize="8" HorizontalAlignment="Center" Margin="0,7,0,9"/>
             </StackPanel>
         </ScrollViewer>
 
-        <!-- Persistent application activity / status bar -->
-        <Border Grid.Row="3" Background="#111C2F" BorderBrush="{StaticResource LineBrush}"
-                BorderThickness="1" CornerRadius="9" Padding="11,9" Margin="0,12,0,0">
+        <Border Grid.Row="3" Background="#111E31" BorderBrush="{StaticResource LineBrush}" BorderThickness="1"
+                CornerRadius="8" Padding="10,8" Margin="0,11,0,0">
             <DockPanel>
-                <Border Width="7" Height="7" Background="{StaticResource GreenBrush}"
-                        CornerRadius="4" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                <TextBlock Text="ACTIVITY" Foreground="{StaticResource MutedBrush}"
-                           FontSize="9" FontWeight="Bold" VerticalAlignment="Center"
-                           Margin="0,0,12,0"/>
+                <Border Width="7" Height="7" Background="{StaticResource GreenBrush}" CornerRadius="4"
+                        VerticalAlignment="Center" Margin="0,0,9,0"/>
+                <TextBlock Text="ACTIVITY" Foreground="{StaticResource MutedBrush}" FontSize="8" FontWeight="Bold"
+                           VerticalAlignment="Center" Margin="0,0,11,0"/>
                 <TextBlock x:Name="StatusText" Text="Ready. Refresh Wi-Fi adapters to begin."
-                           Foreground="#D0DCEF" FontSize="10" VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis"/>
+                           Foreground="#D0DCEF" FontSize="9" VerticalAlignment="Center"/>
             </DockPanel>
         </Border>
     </Grid>
