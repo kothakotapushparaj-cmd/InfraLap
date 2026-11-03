@@ -7,7 +7,6 @@ on:
       - multiwifi-v1.2.1-build-clean
     paths:
       - 'MultiWiFi/InfraLap-MultiWiFi-v1.2.1-source.zip'
-      - '.github/workflows/build-multiwifi-v1.2.1.yml'
 
 permissions:
   contents: read
