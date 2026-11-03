@@ -131,7 +131,8 @@ public partial class MainWindow : Window
         {
             var snapshots = _adapterCards.ToDictionary(
                 x => x.Adapter.IdentityKey,
-                x => new CardSnapshot(x.TargetSsid, x.Nickname.Text),
+                x => new CardSnapshot(x.TargetSsid, x.Nickname.Text, x.Password,
+                    x.PlainPasswordInput.Visibility == Visibility.Visible),
                 StringComparer.OrdinalIgnoreCase);
 
             var detected = await Task.Run(ReadAdapters);
@@ -165,7 +166,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private sealed record CardSnapshot(string Ssid, string Nickname);
+    private sealed record CardSnapshot(string Ssid, string Nickname, string Password, bool PasswordVisible);
 
     private void BuildAdapterCards(IReadOnlyDictionary<string, CardSnapshot>? snapshots = null)
     {
@@ -180,6 +181,14 @@ public partial class MainWindow : Window
             {
                 SetCardSsid(card, snapshot.Ssid);
                 card.Nickname.Text = snapshot.Nickname;
+                card.PasswordInput.Password = snapshot.Password;
+                card.PlainPasswordInput.Text = snapshot.Password;
+                if (snapshot.PasswordVisible)
+                {
+                    card.PasswordInput.Visibility = Visibility.Collapsed;
+                    card.PlainPasswordInput.Visibility = Visibility.Visible;
+                    card.TogglePasswordButton.Content = "Hide password";
+                }
             }
             _adapterCards.Add(card);
             AdapterCardsPanel.Children.Add(card.Root);
@@ -526,21 +535,31 @@ public partial class MainWindow : Window
         var interfaces = ParseInterfaces(interfacesResult.StandardOutput);
         var hardware = ReadHardwareIdentities();
 
-        return interfaces.Select(wlan =>
-        {
-            var info = hardware.FirstOrDefault(x =>
-                string.Equals(x.InterfaceName, wlan.Name, StringComparison.OrdinalIgnoreCase)
-                || (!string.IsNullOrWhiteSpace(wlan.InterfaceGuid)
-                    && string.Equals(NormalizeGuid(x.InterfaceGuid), NormalizeGuid(wlan.InterfaceGuid), StringComparison.OrdinalIgnoreCase)));
-            if (info is null) return wlan;
-            return wlan with
+        return interfaces
+            .Where(wlan =>
             {
-                MacAddress = string.IsNullOrWhiteSpace(wlan.MacAddress) ? info.MacAddress : wlan.MacAddress,
-                PnpDeviceId = info.PnpDeviceId,
-                Manufacturer = info.Manufacturer,
-                InterfaceGuid = string.IsNullOrWhiteSpace(wlan.InterfaceGuid) ? info.InterfaceGuid : wlan.InterfaceGuid
-            };
-        }).ToList();
+                var info = hardware.FirstOrDefault(x =>
+                    string.Equals(x.InterfaceName, wlan.Name, StringComparison.OrdinalIgnoreCase)
+                    || (!string.IsNullOrWhiteSpace(wlan.InterfaceGuid)
+                        && string.Equals(NormalizeGuid(x.InterfaceGuid), NormalizeGuid(wlan.InterfaceGuid), StringComparison.OrdinalIgnoreCase)));
+                var isClearlyVirtual = wlan.Description.Contains("Wi-Fi Direct Virtual Adapter", StringComparison.OrdinalIgnoreCase);
+                return !isClearlyVirtual && (info is null || info.PhysicalAdapter);
+            })
+            .Select(wlan =>
+            {
+                var info = hardware.FirstOrDefault(x =>
+                    string.Equals(x.InterfaceName, wlan.Name, StringComparison.OrdinalIgnoreCase)
+                    || (!string.IsNullOrWhiteSpace(wlan.InterfaceGuid)
+                        && string.Equals(NormalizeGuid(x.InterfaceGuid), NormalizeGuid(wlan.InterfaceGuid), StringComparison.OrdinalIgnoreCase)));
+                if (info is null) return wlan;
+                return wlan with
+                {
+                    MacAddress = string.IsNullOrWhiteSpace(wlan.MacAddress) ? info.MacAddress : wlan.MacAddress,
+                    PnpDeviceId = info.PnpDeviceId,
+                    Manufacturer = info.Manufacturer,
+                    InterfaceGuid = string.IsNullOrWhiteSpace(wlan.InterfaceGuid) ? info.InterfaceGuid : wlan.InterfaceGuid
+                };
+            }).ToList();
     }
 
     private static List<HardwareIdentity> ReadHardwareIdentities()
