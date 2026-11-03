@@ -6,6 +6,7 @@ on:
     branches:
       - multiwifi-v1.2.1-build-clean
     paths:
+      - '.github/workflows/build-multiwifi-v1.2.1.yml'
       - 'MultiWiFi/InfraLap-MultiWiFi-v1.2.1-source.zip'
       - 'MultiWiFi/InfraLap-MultiWiFi-v1.2.1-build-source.zip.b64'
       - 'MultiWiFi/InfraLap-MultiWiFi-v1.2.1-build-source.part6.b64'
