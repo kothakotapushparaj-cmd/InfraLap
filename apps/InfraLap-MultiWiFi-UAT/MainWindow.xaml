@@ -474,7 +474,7 @@
                             <StackPanel>
                                 <TextBlock Text="WINDOWS WLAN PROFILE LIBRARY" Foreground="#80AEFF"
                                            FontSize="9" FontWeight="Bold"/>
-                                <TextBlock Text="Saved networks & credentials" FontSize="18"
+                                <TextBlock Text="Saved networks &amp; credentials" FontSize="18"
                                            FontWeight="Bold" Margin="0,3,0,0"/>
                                 <TextBlock Text="Inspect profiles stored by Windows and load a saved WPA2 network into a connection slot."
                                            Foreground="{StaticResource MutedBrush}" FontSize="10"
