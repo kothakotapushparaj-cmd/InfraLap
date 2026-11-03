@@ -1,0 +1,1 @@
+Upload the exact file InfraLap-MultiWiFi-v1.2.1-source.zip into this folder on branch multiwifi-v1.2.1-build-clean. The upload should be committed to this branch. That push triggers the Windows build workflow. The website Main branch is not changed.
