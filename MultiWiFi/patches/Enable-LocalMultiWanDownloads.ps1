@@ -571,7 +571,7 @@ if (-not $bonding.Contains('Content = "Multi-WAN Download (No VPS)"')) {
 if (!(Test-Path $servicePath) -or !(Test-Path $windowPath) -or
     -not $bonding.Contains('Multi-WAN Download (No VPS)') -or
     -not $service.Contains('ConnectCallback') -or
-    -not $service.Contains('ContentRange.From') -or
+    -not $service.Contains('contentRange.From') -or
     -not $service.Contains('File.Move(mergedPath, fullDestination, overwrite: true)')) {
     throw 'Local VPS-free multi-WAN download source verification failed.'
 }
