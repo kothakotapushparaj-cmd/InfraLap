@@ -1,0 +1,148 @@
+name: InfraLap MultiWiFi v2 Windows Bonding Development Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - multiwifi-v2-bonding
+    paths:
+      - 'MultiWiFi/v2-source.parts/**'
+      - 'MultiWiFi/docs/**'
+      - '.github/workflows/build-multiwifi-v2.yml'
+
+permissions:
+  contents: read
+
+env:
+  CONFIGURATION: Release
+  RUNTIME: win-x64
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - name: Checkout v2 branch
+        uses: actions/checkout@v4
+
+      - name: Reassemble and verify v2 source archive
+        shell: pwsh
+        run: |
+          $partsDir = Join-Path $env:GITHUB_WORKSPACE 'MultiWiFi/v2-source.parts'
+          $parts = @(Get-ChildItem -Path $partsDir -Filter 'source.v2zip.chunk*.b64' -File | Sort-Object Name)
+          if ($parts.Count -lt 1) { throw 'No v2 source archive chunks found.' }
+          $builder = [System.Text.StringBuilder]::new()
+          foreach ($part in $parts) {
+            $chunk = (Get-Content -Raw -Path $part.FullName).Trim()
+            if ($chunk -notmatch '^[A-Za-z0-9+/]+=*$') { throw "Invalid base64 characters in $($part.Name)" }
+            [void]$builder.Append($chunk)
+          }
+          $encoded = $builder.ToString()
+          if (($encoded.Length % 4) -ne 0) { throw "Joined base64 length is not divisible by four: $($encoded.Length)" }
+          $archive = Join-Path $env:RUNNER_TEMP 'InfraLap-MultiWiFi-v2-source.zip'
+          [IO.File]::WriteAllBytes($archive, [Convert]::FromBase64String($encoded))
+          $expected = (Get-Content (Join-Path $partsDir 'source.sha256') -Raw).Trim().ToLowerInvariant()
+          $actual = (Get-FileHash -Path $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw "V2 source archive SHA-256 mismatch. Expected $expected, got $actual" }
+          $sourceRoot = Join-Path $env:GITHUB_WORKSPACE 'MultiWiFi/v2-source'
+          if (Test-Path $sourceRoot) { Remove-Item $sourceRoot -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $sourceRoot | Out-Null
+          Expand-Archive -Path $archive -DestinationPath $sourceRoot -Force
+          $projectRoot = Join-Path $sourceRoot 'InfraLap-MultiWiFi-v2'
+          if (!(Test-Path (Join-Path $projectRoot 'InfraLap.MultiWiFi-v2.sln'))) { throw 'Extracted v2 solution was not found at the expected path.' }
+          "V2_SOURCE_ARCHIVE=$archive" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "V2_PROJECT_ROOT=$projectRoot" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "Reassembled and verified $($parts.Count) source chunks."
+
+      - name: Set up .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download and verify official Wintun x64 package
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'wintun-0.14.1.zip'
+          Invoke-WebRequest -Uri 'https://www.wintun.net/builds/wintun-0.14.1.zip' -OutFile $archive
+          $actual = (Get-FileHash -Path $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          $expected = '07c256185d6ee3652e09fa55c0b673e2624b565e02c4b9091c79ca7d2f24ef51'
+          if ($actual -ne $expected) { throw "Wintun archive SHA-256 mismatch. Expected $expected, got $actual" }
+          $root = Join-Path $env:RUNNER_TEMP 'wintun-package'
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
+          Expand-Archive -Path $archive -DestinationPath $root -Force
+          $dll = Get-ChildItem -Path $root -Filter 'wintun.dll' -File -Recurse | Where-Object { $_.FullName -match '\\(amd64|x64)\\wintun\.dll$' } | Select-Object -First 1
+          if (!$dll) { throw 'Official Wintun archive did not contain an AMD64 wintun.dll.' }
+          $license = Get-ChildItem -Path $root -File -Recurse | Where-Object { $_.Name -match '^(COPYING|LICENSE)(\.txt)?$' } | Select-Object -First 1
+          if (!$license) { throw 'Wintun license file not found in official archive.' }
+          "WINTUN_DLL=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "WINTUN_LICENSE=$($license.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Restore solution
+        shell: pwsh
+        run: dotnet restore (Join-Path $env:V2_PROJECT_ROOT 'InfraLap.MultiWiFi-v2.sln')
+
+      - name: Build solution
+        shell: pwsh
+        run: dotnet build (Join-Path $env:V2_PROJECT_ROOT 'InfraLap.MultiWiFi-v2.sln') -c $env:CONFIGURATION --no-restore -p:Platform=x64
+
+      - name: Run bonding logic smoke tests
+        shell: pwsh
+        run: dotnet run --project (Join-Path $env:V2_PROJECT_ROOT 'tests/InfraLap.MultiWiFi.Bonding.Smoke/InfraLap.MultiWiFi.Bonding.Smoke.csproj') -c $env:CONFIGURATION --no-build
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $candidates = @("${env:ProgramFiles(x86)}\\Inno Setup 6\\ISCC.exe", "$env:ProgramFiles\\Inno Setup 6\\ISCC.exe")
+          $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (!$iscc) { throw 'Inno Setup compiler was not found.' }
+          "ISCC_PATH=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Publish Windows x64 client and relay
+        shell: pwsh
+        run: |
+          $projectRoot = $env:V2_PROJECT_ROOT
+          $publishRoot = Join-Path $projectRoot 'publish'
+          $appOut = Join-Path $publishRoot 'app'
+          $relayOut = Join-Path $publishRoot 'relay'
+          New-Item -ItemType Directory -Force -Path $appOut,$relayOut | Out-Null
+          dotnet publish (Join-Path $projectRoot 'Client/src/InfraLap.MultiWiFi.App/InfraLap.MultiWiFi.App.csproj') -c $env:CONFIGURATION -r $env:RUNTIME --self-contained true -p:Platform=x64 -o $appOut
+          if ($LASTEXITCODE -ne 0) { throw "Client publish failed: $LASTEXITCODE" }
+          dotnet publish (Join-Path $projectRoot 'Relay/InfraLap.MultiWiFi.Relay.csproj') -c $env:CONFIGURATION -r $env:RUNTIME --self-contained true -p:Platform=x64 -o $relayOut
+          if ($LASTEXITCODE -ne 0) { throw "Relay publish failed: $LASTEXITCODE" }
+          Copy-Item $env:WINTUN_DLL -Destination (Join-Path $appOut 'wintun.dll') -Force
+          Copy-Item $env:WINTUN_DLL -Destination (Join-Path $relayOut 'wintun.dll') -Force
+          Copy-Item $env:WINTUN_LICENSE -Destination (Join-Path $appOut 'WINTUN-LICENSE.txt') -Force
+          Copy-Item $env:WINTUN_LICENSE -Destination (Join-Path $relayOut 'WINTUN-LICENSE.txt') -Force
+          $required = @((Join-Path $appOut 'InfraLap.MultiWiFi.exe'),(Join-Path $relayOut 'InfraLap.MultiWiFi.Relay.exe'),(Join-Path $appOut 'wintun.dll'),(Join-Path $relayOut 'wintun.dll'))
+          foreach ($file in $required) { if (!(Test-Path $file)) { throw "Required package file missing: $file" } }
+
+      - name: Compile branded Windows installer
+        shell: pwsh
+        run: |
+          $projectRoot = $env:V2_PROJECT_ROOT
+          & $env:ISCC_PATH (Join-Path $projectRoot 'installer/InfraLap-MultiWiFi-v2.iss')
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed: $LASTEXITCODE" }
+          $setup = Join-Path $projectRoot 'installer-output/InfraLap-MultiWiFi-Setup-v2.0.0-dev-x64.exe'
+          if (!(Test-Path $setup) -or (Get-Item $setup).Length -lt 10MB) { throw 'The v2 installer is missing or unexpectedly small.' }
+
+      - name: Assemble relay package and checksums
+        shell: pwsh
+        run: |
+          $projectRoot = $env:V2_PROJECT_ROOT
+          $release = Join-Path $projectRoot 'release'
+          New-Item -ItemType Directory -Force -Path $release | Out-Null
+          Copy-Item (Join-Path $projectRoot 'scripts') (Join-Path $projectRoot 'publish/relay/scripts') -Recurse -Force
+          Copy-Item (Join-Path $projectRoot 'README.md') (Join-Path $projectRoot 'publish/relay/README-RELAY-SETUP.md') -Force
+          Compress-Archive -Path (Join-Path $projectRoot 'publish/relay/*') -DestinationPath (Join-Path $release 'InfraLap-MultiWiFi-Windows-Relay-v2.0.0-dev-x64.zip') -Force
+          Copy-Item $env:V2_SOURCE_ARCHIVE (Join-Path $release 'InfraLap-MultiWiFi-v2.0.0-dev-source.zip') -Force
+          Copy-Item (Join-Path $projectRoot 'installer-output/InfraLap-MultiWiFi-Setup-v2.0.0-dev-x64.exe') $release -Force
+          Get-ChildItem $release -File | Get-FileHash -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($_.Path))" } | Set-Content (Join-Path $release 'SHA256SUMS.txt')
+
+      - name: Upload development artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: InfraLap-MultiWiFi-v2.0.0-dev-x64
+          path: MultiWiFi/v2-source/release/*
+          if-no-files-found: error
+          retention-days: 30
