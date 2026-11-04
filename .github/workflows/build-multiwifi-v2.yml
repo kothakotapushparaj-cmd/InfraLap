@@ -510,7 +510,9 @@ jobs:
                       if (networkPicker.SelectedItem is not WifiNetwork selected) { _status.Text = "Select a network first."; return; }
                       await RunCardActionAsync(async () =>
                       {
-                          var profile = await Task.Run(() => _wifi.SaveOrUpdateProfile(adapter.InterfaceGuid, selected, password.Password, autoConnect.IsChecked == true));
+                          var newPassword = password.Password;
+                          var shouldConnectAutomatically = autoConnect.IsChecked == true;
+                          var profile = await Task.Run(() => _wifi.SaveOrUpdateProfile(adapter.InterfaceGuid, selected, newPassword, shouldConnectAutomatically));
                           _status.Text = $"Saved Windows Wi-Fi profile '{profile}'. Reconnecting...";
                           _status.Text = await _wifi.ConnectAndVerifyAsync(adapter.InterfaceGuid, profile, selected.Ssid);
                           password.Clear();
