@@ -13,6 +13,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: multiwifi-v2-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CONFIGURATION: Release
   RUNTIME: win-x64
