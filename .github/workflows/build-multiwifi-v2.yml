@@ -83,6 +83,25 @@ jobs:
             Get-Content -Raw -Path $file.FullName
           }
 
+      - name: Inspect Wi-Fi UI and profile management wiring
+        shell: pwsh
+        run: |
+          $root = $env:V2_PROJECT_ROOT
+          $targets = @(
+            'Client/src/InfraLap.MultiWiFi.App/MainWindow.xaml',
+            'Client/src/InfraLap.MultiWiFi.App/MainWindow.xaml.cs',
+            'Client/src/InfraLap.MultiWiFi.App/BondingWindow.xaml',
+            'Client/src/InfraLap.MultiWiFi.App/Models/WifiInterface.cs',
+            'Client/src/InfraLap.MultiWiFi.App/Models/WifiNetwork.cs',
+            'Client/src/InfraLap.MultiWiFi.App/InfraLap.MultiWiFi.App.csproj'
+          )
+          foreach ($relative in $targets) {
+            $file = Join-Path $root $relative
+            if (Test-Path $file) {
+              Write-Host ("=== UI SOURCE: " + $relative + " ===")
+              Get-Content -Raw -Path $file
+            }
+          }
       - name: Inspect relay session registration and selected adapter models
         shell: pwsh
         run: |
