@@ -15,7 +15,7 @@ Those approaches can be useful, but they do not deliver system-wide packet-level
 
 A Windows client cannot make an arbitrary Internet server combine two unrelated TCP paths merely by choosing two local Wi-Fi adapters. The traffic needs a common remote aggregation point. The remote point receives packets over both physical paths, reorders/forwards the inner traffic, and provides one public Internet egress address.
 
-The upstream MPTCP project documents native MPTCP support in the Linux kernel (v5.6+) and notes that Windows usage is via WSL2; ordinary endpoints without MPTCP continue as plain TCP. RFC 8684 describes MPTCP as a transport extension negotiated by both endpoints. Therefore, do not market the Windows app as native MPTCP.
+The upstream MPTCP project documents native MPTCP support in the Linux kernel (v5.6+) and notes that Windows usage is via WSL2; ordinary endpoints without MPTCP continue as plain TCP. RFC 8684 describes MPTCP as a transport extension negotiated by both endpoints. Therefore, do not market the Windows app as native MPTCP. InfraLap's Windows-only deployment uses its own authenticated multipath tunnel between a Windows client and a Windows Server relay; the relay gives ordinary Internet servers a single egress path.
 
 ## Proposed InfraLap architecture
 
@@ -32,10 +32,10 @@ UDP path A, bound to Wi-Fi A      UDP path B, bound to Wi-Fi B
         |                         |
         +------ Internet ----------+
                     |
-           InfraLap Linux Relay
+           InfraLap Windows Relay Service
            authenticate / decrypt
            packet sequencing / reordering
-           route inner IP packets
+           Windows virtual adapter / routing
            NAT to relay public IP
                     |
                Public Internet
@@ -56,15 +56,21 @@ Return traffic follows the reverse path: the relay encapsulates packets and sche
 - Provide an explicit disconnect/restore path so stopping the service restores the original Windows routes and DNS.
 - Start with IPv4-only full-tunnel mode; add IPv6 only after IPv6 routing, leak prevention and DNS behavior are tested.
 
-### Linux relay
+### Windows relay (Windows-only deployment target)
 
-- A public Linux VPS with a stable public IPv4 address and reachable UDP port is required.
+- Use a public Windows Server VPS (target Windows Server 2022 or 2025, subject to driver and provider validation) with a stable public IPv4 address and a reachable UDP port.
+- Run the InfraLap Relay as a Windows service; keep it separate from the WPF desktop client.
+- Use a Windows Layer-3 virtual adapter (Wintun or another signed, supported Windows TUN driver) to carry inner IP packets. Validate driver installation and service recovery on the exact Windows Server SKU before release; do not assume desktop-driver compatibility without testing.
 - Authenticate clients and assign each client a distinct tunnel IPv4 address.
 - Maintain independent NAT path mappings for each client transport socket.
 - Decrypt and validate encapsulated packets; reject invalid tags, stale/replayed sequence numbers, malformed lengths and unknown sessions.
-- Forward inner packets through a TUN interface and NAT them to the VPS public egress interface.
+- Forward inner packets through the relay virtual adapter and use Windows Server routing/NAT (RRAS Routing role or WinNAT where supported) to egress through the VPS public interface.
 - Encapsulate Internet return packets and schedule them back across the active client paths.
 - Apply per-client bandwidth, packet-rate and session limits.
+- Check for pre-existing Hyper-V, Docker, HNS or WinNAT networks. Microsoft documents WinNAT as supporting one internal NAT subnet prefix per host in the relevant Hyper-V NAT scenario, so the relay installer must detect conflicts and never overwrite existing NAT configuration automatically.
+- The relay setup must be reversible and show exactly which Windows routes, NAT objects, firewall rules and virtual interfaces it creates.
+
+A Linux relay remains a possible later backend for operators who prefer it, but it is **not required** for the Windows-only product requested here. There will be no Linux app, WSL dependency or Linux commands in the Windows client installation workflow.
 
 ### Secure transport requirements
 
@@ -95,7 +101,7 @@ MPTCP is a standards-based solution when both endpoints and their stacks support
 
 - A single ordinary TCP download (not a set of HTTP Range sub-downloads) traverses the virtual adapter.
 - During that exact download, both selected Wi-Fi adapters carry sustained encrypted tunnel payload.
-- The relay forwards all traffic through one public egress address.
+- The Windows relay forwards all traffic through one public egress address.
 - The sum of delivered goodput is measured end-to-end; do not promise the arithmetic sum of ISP speed tests. RTT mismatch, congestion, loss and relay capacity can reduce the result.
 - Disconnecting either adapter does not crash the client; traffic continues on the surviving path after recovery.
 - Stopping/uninstalling the service restores the original routes and DNS.
@@ -103,6 +109,6 @@ MPTCP is a standards-based solution when both endpoints and their stacks support
 
 ## Current status
 
-v1.2.1 does not contain a bonding tunnel, Wintun virtual adapter, relay protocol or server. Its combined traffic display is an arithmetic sum of adapter counters and must not be represented as bonded throughput.
+v1.2.1 does not contain a bonding tunnel, Wintun virtual adapter, relay protocol or server. v2 is designed as Windows 10/11 x64 client + Windows Server relay; the relay's virtual-adapter driver and NAT integration must be validated on the chosen Windows Server image before installer release. Its combined traffic display is an arithmetic sum of adapter counters and must not be represented as bonded throughput.
 
 This document is an engineering design, not a claim that the client or relay has been implemented or security-audited.
