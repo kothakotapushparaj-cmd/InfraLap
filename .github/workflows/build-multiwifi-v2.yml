@@ -188,9 +188,6 @@ jobs:
             if (-not $window.Contains($oldBanner)) { throw 'BondingWindow status banner insertion point not found.' }
             $window = $window.Replace($oldBanner, $newBanner)
           }
-          $lineCheck = $window -split "`r?`n"
-          Write-Host '=== GENERATED BONDINGWINDOW LINES 178-190 ==='
-          for ($lineNo = 178; $lineNo -le 190 -and $lineNo -le $lineCheck.Length; $lineNo++) { Write-Host ("{0}: {1}" -f $lineNo, $lineCheck[$lineNo - 1]) }
           [IO.File]::WriteAllText($windowPath, $window, [Text.UTF8Encoding]::new($false))
 
           # Verify Windows selects the expected physical interface for the relay
@@ -874,6 +871,9 @@ jobs:
             }
           }
           [IO.File]::WriteAllText($windowPath, $window, [Text.UTF8Encoding]::new($false))
+          $finalLines = $window -split "`r?`n"
+          Write-Host '=== FINAL GENERATED BONDINGWINDOW LINES 175-195 ==='
+          for ($lineNo = 175; $lineNo -le 195 -and $lineNo -le $finalLines.Length; $lineNo++) { Write-Host ("{0} [{1} chars]: {2}" -f $lineNo, $finalLines[$lineNo - 1].Length, $finalLines[$lineNo - 1]) }
 
           $xamlPath = Join-Path $root 'Client/src/InfraLap.MultiWiFi.App/BondingWindow.xaml'
           $xaml = [IO.File]::ReadAllText($xamlPath)
