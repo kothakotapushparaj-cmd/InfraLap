@@ -9,6 +9,7 @@ New-Item -ItemType Directory -Force -Path $services | Out-Null
 $service = @'
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -283,8 +284,8 @@ public sealed class LocalMultiWanDownloadWindow : Window
     private readonly ProgressBar _progress = new();
     private readonly TextBlock _status = new();
     private readonly TextBlock _pathStats = new();
-    private readonly Button _start = new();
-    private readonly Button _cancel = new();
+    private Button _start = new();
+    private Button _cancel = new();
     private CancellationTokenSource? _cancellation;
 
     public LocalMultiWanDownloadWindow(IReadOnlyList<PathChoice> paths)
