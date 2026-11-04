@@ -132,3 +132,28 @@ For v2, standardize branding across all Windows surfaces:
 - **Brand colors:** use the logo's blue and orange as accents, with dark navy/neutral surfaces for the technical UI. Preserve readability and accessible contrast.
 
 Brand QA must verify the main-window logo is visible on light and dark backgrounds, the icon is not stretched, installer branding matches the application, and the Windows publisher metadata consistently reads InfraLap Solutions.
+
+
+## v2 implementation snapshot — 2026-11-04
+
+A Windows-only development prototype has now been prepared in the separate v2 source tree. Its data path is:
+
+- Windows client: WPF management application plus a Wintun Layer-3 interface.
+- Physical paths: one TLS 1.3 QUIC connection per selected Wi-Fi adapter, each created with the adapter's local IPv4 address as the QUIC local endpoint.
+- Multipath session: authenticated path registration, packet framing, a bounded anti-replay window, equal-weight packet striping, and per-path byte counters.
+- Windows relay: QUIC listener, a shared Wintun relay interface, IPv4 forwarding and WinNAT setup scripts.
+- Return path: relay Wintun packets are sent back over the same set of independently connected QUIC paths.
+
+A relay connection-lifetime defect found during source review was corrected: after a path is accepted and transferred to the peer, the handler now leaves its QUIC connection open rather than disposing it during cleanup. The client and relay network scripts also wait for the Wintun adapter to appear before configuring routes or NAT.
+
+## Development-build limitations
+
+This source is **not yet a verified release**. The Windows GitHub Actions build and compile/smoke checks still need to pass. In addition, no real two-modem UAT has been run. In particular:
+
+- The prototype runs the data plane inside the elevated desktop application; it is not yet a separately installed Windows service.
+- The relay is a foreground process and currently supports one bonded client session per relay process.
+- The scheduler is an initial equal-weight round-robin scheduler, not yet an adaptive scheduler based on measured WAN goodput, latency and loss.
+- The initial implementation tunnels IPv4 only. IPv6 leak blocking, crash-safe route recovery, installer rollback testing, multi-client isolation, independent security review and physical Windows Server validation remain outstanding.
+- The single-download acceptance test must show sustained payload bytes on both physical adapters while one ordinary TCP download runs through Wintun. A successful compile or synthetic scheduler test is not proof of that acceptance test.
+
+Do not distribute this development build as a production VPN or promise that it will deliver the arithmetic sum of the two broadband plans. Actual goodput depends on path capacity, latency, packet loss, relay capacity and queueing.
