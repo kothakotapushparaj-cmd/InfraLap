@@ -111,6 +111,122 @@ jobs:
             }
           }
 
+      - name: Patch QUIC binding verification and route diagnostics
+        shell: pwsh
+        run: |
+          $root = $env:V2_PROJECT_ROOT
+          function Replace-SourceText([string]$relative, [string]$oldText, [string]$newText, [string]$label) {
+            $path = Join-Path $root $relative
+            $source = [IO.File]::ReadAllText($path)
+            if ($source.Contains($newText)) {
+              Write-Host "Already patched: $label"
+              return
+            }
+            if (-not $source.Contains($oldText)) {
+              throw "Could not find expected source text for patch '$label' in $relative."
+            }
+            $source = $source.Replace($oldText, $newText)
+            [IO.File]::WriteAllText($path, $source, [Text.UTF8Encoding]::new($false))
+            Write-Host "Applied: $label"
+          }
+
+          Replace-SourceText 'Shared/InfraLap.MultiWiFi.Bonding/QuicPathLink.cs' @'
+          public string Name { get; }
+              public IPAddress? LocalAddress { get; }
+              public bool IsConnected => Volatile.Read(ref _disposed) == 0 && Volatile.Read(ref _disconnected) == 0;
+          '@ @'
+          public string Name { get; }
+              public IPAddress? LocalAddress { get; }
+              public EndPoint? BoundLocalEndPoint => _connection.LocalEndPoint;
+              public EndPoint? RelayRemoteEndPoint => _connection.RemoteEndPoint;
+              public bool IsConnected => Volatile.Read(ref _disposed) == 0 && Volatile.Read(ref _disconnected) == 0;
+          '@ 'Expose actual QUIC endpoints'
+
+          Replace-SourceText 'Shared/InfraLap.MultiWiFi.Bonding/QuicPathLink.cs' @'
+                  var connection = await QuicConnection.ConnectAsync(options, cancellationToken).ConfigureAwait(false);
+                  try
+                  {
+                      var stream = await connection.OpenOutboundStreamAsync(QuicStreamType.Bidirectional, cancellationToken).ConfigureAwait(false);
+          '@ @'
+                  var connection = await QuicConnection.ConnectAsync(options, cancellationToken).ConfigureAwait(false);
+                  try
+                  {
+                      var actualLocal = connection.LocalEndPoint as IPEndPoint;
+                      if (actualLocal is null || !actualLocal.Address.Equals(path.LocalAddress))
+                          throw new IOException($"QUIC path '{path.Name}' requested local address {path.LocalAddress}, but the connected socket reports {connection.LocalEndPoint}.");
+
+                      var stream = await connection.OpenOutboundStreamAsync(QuicStreamType.Bidirectional, cancellationToken).ConfigureAwait(false);
+          '@ 'Fail fast when QUIC local endpoint is not the selected adapter address'
+
+          Replace-SourceText 'Shared/InfraLap.MultiWiFi.Bonding/MultipathPeer.cs' @'
+                          x.Name, x.LocalAddress ?? System.Net.IPAddress.None, x.IsConnected,
+                          x.BytesSent, x.BytesReceived, x.IsConnected ? "Connected" : "Disconnected")).ToArray();
+          '@ @'
+                          x.Name, x.LocalAddress ?? System.Net.IPAddress.None, x.IsConnected,
+                          x.BytesSent, x.BytesReceived,
+                          x.IsConnected
+                              ? $"Connected · bound {x.BoundLocalEndPoint} · relay {x.RelayRemoteEndPoint}"
+                              : "Disconnected")).ToArray();
+          '@ 'Report each path actual local and relay endpoints'
+
+          Replace-SourceText 'Client/src/InfraLap.MultiWiFi.App/BondingWindow.xaml.cs' @'
+                      status.Text = path.Connected ? $"Connected · {path.LocalAddress}" : "Disconnected";
+          '@ @'
+                      status.Text = path.State;
+          '@ 'Show verified QUIC endpoint status in UI'
+
+          Replace-SourceText 'Client/src/InfraLap.MultiWiFi.App/BondingWindow.xaml.cs' @'
+                      BondingStatus.Text = "BONDED TUNNEL ACTIVE · IPv4 traffic is routed through InfraLap. Test with one ordinary download and verify both paths receive traffic.";
+          '@ @'
+                      BondingStatus.Text = "Two QUIC paths established. Per-path tunnel traffic is being measured; bonding is not verified until both paths carry payload during one download.";
+          '@ 'Use accurate unverified tunnel status'
+
+          $routeRelative = 'scripts/Connect-InfraLapClient.ps1'
+          $routePath = Join-Path $root $routeRelative
+          $route = [IO.File]::ReadAllText($routePath)
+          $routeOld = @'
+                  if (-not $matching) {
+                      New-NetRoute -DestinationPrefix "$RelayIPv4/32" -InterfaceIndex $physical.ifIndex -NextHop $gateway -RouteMetric 1 -PolicyStore ActiveStore | Out-Null
+                      $state.CreatedRelayRoutes += [pscustomobject]@{ DestinationPrefix = "$RelayIPv4/32"; InterfaceIndex = $physical.ifIndex; NextHop = $gateway }
+                      Save-State
+                  }
+              }
+              $existingTunnelAddress = Get-NetIPAddress -InterfaceIndex $tunnel.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object IPAddress -eq $TunnelAddress
+          '@
+          $routeNew = @'
+                  if (-not $matching) {
+                      New-NetRoute -DestinationPrefix "$RelayIPv4/32" -InterfaceIndex $physical.ifIndex -NextHop $gateway -RouteMetric 1 -PolicyStore ActiveStore | Out-Null
+                      $state.CreatedRelayRoutes += [pscustomobject]@{ DestinationPrefix = "$RelayIPv4/32"; InterfaceIndex = $physical.ifIndex; NextHop = $gateway }
+                      Save-State
+                  }
+
+                  $localAddress = $ipConfig.IPv4Address |
+                      Where-Object { $_.IPAddress -and $_.IPAddress -notlike '169.254.*' } |
+                      Select-Object -First 1 -ExpandProperty IPAddress
+                  if (-not $localAddress) { throw "No usable IPv4 source address found on '$alias'." }
+
+                  $selectedRoute = Find-NetRoute -RemoteIPAddress $RelayIPv4 -LocalIPAddress $localAddress -ErrorAction Stop
+                  $selectedInterface = @($selectedRoute | Where-Object {
+                      $_.PSObject.Properties['InterfaceIndex'] -and [int]$_.InterfaceIndex -eq [int]$physical.ifIndex
+                  } | Select-Object -First 1)
+                  if ($selectedInterface.Count -eq 0) {
+                      $routeDetails = ($selectedRoute | Format-List * | Out-String).Trim()
+                      throw "Windows did not select '$alias' (ifIndex $($physical.ifIndex)) for relay $RelayIPv4 from source $localAddress. Route result: $routeDetails"
+                  }
+                  Write-Host "Verified relay route: adapter='$alias' ifIndex=$($physical.ifIndex) source=$localAddress gateway=$gateway relay=$RelayIPv4"
+              }
+              $existingTunnelAddress = Get-NetIPAddress -InterfaceIndex $tunnel.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object IPAddress -eq $TunnelAddress
+          '@
+          if ($route.Contains($routeNew)) {
+            Write-Host 'Already patched: verify Windows relay route per adapter'
+          } elseif ($route.Contains($routeOld)) {
+            $route = $route.Replace($routeOld, $routeNew)
+            [IO.File]::WriteAllText($routePath, $route, [Text.UTF8Encoding]::new($false))
+            Write-Host 'Applied: verify Windows relay route per adapter'
+          } else {
+            throw 'Could not find expected route-script insertion point.'
+          }
+
       - name: Apply System.IO compile fix and stage patched source
         shell: pwsh
         run: |
