@@ -811,7 +811,7 @@ jobs:
               New = '            BondingStatus.Text = $"{_client.Peer.Paths.Count} QUIC path(s) connected. Creating the single InfraLap virtual adapter...";'
             },
             @{
-              Old = '            BondingStatus.Text = "BONDED TUNNEL ACTIVE · IPv4 traffic is routed through InfraLap. Test with one ordinary download and verify both paths receive traffic.";'
+              Old = '            BondingStatus.Text = "Two QUIC paths established. Per-path tunnel traffic is being measured; bonding is not verified until both paths carry payload during one download.";'
               New = '            BondingStatus.Text = $"BONDED TUNNEL ACTIVE · One InfraLap virtual adapter is carrying IPv4 traffic across {_client.Peer.Paths.Count} connected path(s). Verify each path receives traffic during one ordinary download.";'
             },
             @{
