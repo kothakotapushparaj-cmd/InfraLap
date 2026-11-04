@@ -672,7 +672,7 @@ jobs:
               pairingButton.Click += (_, _) => ImportRelayPairingFile();
               System.Windows.Controls.DockPanel.SetDock(pairingButton, System.Windows.Controls.Dock.Right);
               bar.Children.Add(pairingButton);
-            '@
+          '@
             $bonding = $bonding.Replace($toolbarMarker, $pairingButton + [Environment]::NewLine + $toolbarMarker)
           }
 
@@ -752,7 +752,7 @@ jobs:
               TokenBox.Password = token;
           }
 
-            '@
+          '@
             $insertAt = '    private void RefreshPaths_Click(object sender, RoutedEventArgs e) => RefreshPaths();'
             if (-not $bonding.Contains($insertAt)) { throw 'Pairing methods insertion point was not found.' }
             $bonding = $bonding.Replace($insertAt, $methods + $insertAt)
