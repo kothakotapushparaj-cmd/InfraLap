@@ -163,6 +163,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: InfraLap-MultiWiFi-v2.0.0-dev-x64
-          path: MultiWiFi/v2-source/release/*
+          path: MultiWiFi/v2-source/InfraLap-MultiWiFi-v2/release/*
           if-no-files-found: error
           retention-days: 30
