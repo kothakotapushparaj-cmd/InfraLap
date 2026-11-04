@@ -96,7 +96,7 @@ jobs:
 
       - name: Run bonding logic smoke tests
         shell: pwsh
-        run: dotnet run --project (Join-Path $env:V2_PROJECT_ROOT 'tests/InfraLap.MultiWiFi.Bonding.Smoke/InfraLap.MultiWiFi.Bonding.Smoke.csproj') -c $env:CONFIGURATION --no-build
+        run: dotnet run --project (Join-Path $env:V2_PROJECT_ROOT 'tests/InfraLap.MultiWiFi.Bonding.Smoke/InfraLap.MultiWiFi.Bonding.Smoke.csproj') -c $env:CONFIGURATION
 
       - name: Install Inno Setup
         shell: pwsh
