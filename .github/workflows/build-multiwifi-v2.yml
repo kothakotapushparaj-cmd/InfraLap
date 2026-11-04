@@ -823,6 +823,201 @@ jobs:
           $required = @((Join-Path $appOut 'InfraLap.MultiWiFi.exe'),(Join-Path $relayOut 'InfraLap.MultiWiFi.Relay.exe'),(Join-Path $appOut 'wintun.dll'),(Join-Path $relayOut 'wintun.dll'))
           foreach ($file in $required) { if (!(Test-Path $file)) { throw "Required package file missing: $file" } }
 
+      - name: Add one-click Windows VPS relay installer
+        shell: pwsh
+        run: |
+          $projectRoot = $env:V2_PROJECT_ROOT
+          $relayRoot = Join-Path $projectRoot 'publish/relay'
+          if (!(Test-Path (Join-Path $relayRoot 'InfraLap.MultiWiFi.Relay.exe'))) { throw 'Published relay executable is missing.' }
+
+          $setup = @'
+          [CmdletBinding()]
+          param()
+          $ErrorActionPreference = 'Stop'
+
+          $identityDir = Join-Path $env:ProgramData 'InfraLap\Relay'
+          $taskName = 'InfraLap MultiWiFi Relay'
+          $relayRoot = $PSScriptRoot
+          $relayExe = Join-Path $relayRoot 'InfraLap.MultiWiFi.Relay.exe'
+          $wintunDll = Join-Path $relayRoot 'wintun.dll'
+          $configureScript = Join-Path $relayRoot 'scripts\Configure-InfraLapRelay-Network.ps1'
+          $networkState = Join-Path $identityDir 'network-state.json'
+
+          $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+          if (-not $isAdmin) { throw 'Run START-INFraLap-Relay-Setup.cmd and approve the Administrator prompt.' }
+          if (!(Test-Path $relayExe) -or !(Test-Path $wintunDll) -or !(Test-Path $configureScript)) {
+              throw 'Relay package is incomplete. Extract the complete InfraLap relay ZIP before running setup.'
+          }
+
+          $os = Get-CimInstance Win32_OperatingSystem
+          if ($os.ProductType -eq 1 -or [version]$os.Version -lt [version]'10.0.20348') {
+              throw 'This relay setup requires Windows Server 2022 or later.'
+          }
+
+          Write-Host 'InfraLap MultiWiFi — One-click VPS setup' -ForegroundColor Cyan
+          Write-Host 'Detecting the VPS internet interface and public IPv4 address...'
+          $defaultRoute = Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' -ErrorAction Stop |
+              Where-Object { $_.NextHop -and $_.NextHop -ne '0.0.0.0' } |
+              Sort-Object RouteMetric |
+              Select-Object -First 1
+          if (-not $defaultRoute) { throw 'No active IPv4 default route was found on this VPS.' }
+          $external = Get-NetAdapter -InterfaceIndex $defaultRoute.InterfaceIndex -ErrorAction Stop
+          if ($external.Status -ne 'Up') { throw "The VPS internet adapter '$($external.Name)' is not Up." }
+
+          $publicHost = $null
+          try {
+              $publicHost = ([string](Invoke-RestMethod -Uri 'https://api.ipify.org' -TimeoutSec 15)).Trim()
+              $parsedHost = [System.Net.IPAddress]::Parse($publicHost)
+              if ($parsedHost.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) { $publicHost = $null }
+          } catch { $publicHost = $null }
+          if ([string]::IsNullOrWhiteSpace($publicHost)) {
+              throw 'The VPS public IPv4 address could not be detected automatically. Confirm outbound internet access and try again.'
+          }
+
+          New-Item -ItemType Directory -Force -Path $identityDir | Out-Null
+          $pfxPath = Join-Path $identityDir 'InfraLap-Relay.pfx'
+          $passwordPath = Join-Path $identityDir 'pfx-password.txt'
+          $tokenPath = Join-Path $identityDir 'pairing-token.txt'
+          $pairingPath = Join-Path $identityDir 'InfraLap-Client-Pairing.json'
+
+          if (!(Test-Path $pfxPath) -or !(Test-Path $passwordPath)) {
+              Write-Host 'Creating the relay certificate and private key...'
+              $randomPassword = New-Object byte[] 32
+              $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+              try { $rng.GetBytes($randomPassword) } finally { $rng.Dispose() }
+              $pfxPassword = [Convert]::ToBase64String($randomPassword).TrimEnd('=')
+              [Array]::Clear($randomPassword, 0, $randomPassword.Length)
+              $securePassword = ConvertTo-SecureString $pfxPassword -AsPlainText -Force
+              $certificate = New-SelfSignedCertificate -Subject "CN=$publicHost" -DnsName $publicHost -CertStoreLocation 'Cert:\LocalMachine\My' -KeyAlgorithm RSA -KeyLength 3072 -HashAlgorithm SHA256 -KeyExportPolicy Exportable -NotAfter (Get-Date).AddYears(2)
+              Export-PfxCertificate -Cert $certificate -FilePath $pfxPath -Password $securePassword -Force | Out-Null
+              [IO.File]::WriteAllText($passwordPath, $pfxPassword, [Text.Encoding]::UTF8)
+          }
+          if (!(Test-Path $tokenPath) -or [string]::IsNullOrWhiteSpace((Get-Content -Raw $tokenPath))) {
+              $randomToken = New-Object byte[] 32
+              $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+              try { $rng.GetBytes($randomToken) } finally { $rng.Dispose() }
+              $pairingToken = [Convert]::ToBase64String($randomToken)
+              [Array]::Clear($randomToken, 0, $randomToken.Length)
+              [IO.File]::WriteAllText($tokenPath, $pairingToken, [Text.Encoding]::UTF8)
+          } else {
+              $pairingToken = (Get-Content -Raw $tokenPath).Trim()
+          }
+
+          $pfxPassword = (Get-Content -Raw $passwordPath).Trim()
+          $loadedCertificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($pfxPath, $pfxPassword, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
+          try {
+              $sha = [Security.Cryptography.SHA256]::Create()
+              try { $certificatePin = [BitConverter]::ToString($sha.ComputeHash($loadedCertificate.RawData)).Replace('-', '') }
+              finally { $sha.Dispose() }
+          } finally { $loadedCertificate.Dispose() }
+
+          $pairing = [ordered]@{
+              serverHost = $publicHost
+              udpPort = 4433
+              certificateSha256 = $certificatePin
+              pairingToken = $pairingToken
+          }
+          $pairing | ConvertTo-Json -Depth 4 | Set-Content -Path $pairingPath -Encoding UTF8
+          & icacls.exe $identityDir /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Could not restrict access to the relay identity folder.' }
+
+          $tunnel = Get-NetAdapter -Name 'InfraLap Relay' -ErrorAction SilentlyContinue
+          if (-not $tunnel) {
+              Write-Host 'Creating the InfraLap Wintun relay adapter...'
+              $arguments = '--port 4433 --pfx "' + $pfxPath + '" --pfx-password-file "' + $passwordPath + '" --token-file "' + $tokenPath + '"'
+              $stdout = Join-Path $identityDir 'adapter-bootstrap.stdout.log'
+              $stderr = Join-Path $identityDir 'adapter-bootstrap.stderr.log'
+              $bootstrap = Start-Process -FilePath $relayExe -ArgumentList $arguments -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+              try {
+                  for ($attempt = 0; $attempt -lt 30; $attempt++) {
+                      Start-Sleep -Seconds 1
+                      $tunnel = Get-NetAdapter -Name 'InfraLap Relay' -ErrorAction SilentlyContinue
+                      if ($tunnel) { break }
+                      if ($bootstrap.HasExited) { break }
+                  }
+              } finally {
+                  if ($bootstrap -and -not $bootstrap.HasExited) { Stop-Process -Id $bootstrap.Id -Force -ErrorAction SilentlyContinue }
+              }
+              if (-not $tunnel) {
+                  $logText = ''
+                  if (Test-Path $stderr) { $logText = Get-Content -Raw $stderr }
+                  throw "The relay could not create the Wintun adapter. $logText"
+              }
+              Start-Sleep -Seconds 2
+          }
+
+          if (!(Test-Path $networkState)) {
+              Write-Host "Configuring Windows forwarding, NAT and UDP 4433 on '$($external.Name)'..."
+              & $configureScript -ExternalInterfaceAlias $external.Name -UdpPort 4433
+          } else {
+              Write-Host 'Existing InfraLap relay network configuration found; keeping it.'
+          }
+
+          $taskArgs = '--port 4433 --pfx "' + $pfxPath + '" --pfx-password-file "' + $passwordPath + '" --token-file "' + $tokenPath + '"'
+          $action = New-ScheduledTaskAction -Execute $relayExe -Argument $taskArgs -WorkingDirectory $relayRoot
+          $trigger = New-ScheduledTaskTrigger -AtStartup
+          $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+          $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
+          Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+          Start-ScheduledTask -TaskName $taskName
+          Start-Sleep -Seconds 3
+
+          $udpListener = Get-NetUDPEndpoint -LocalPort 4433 -ErrorAction SilentlyContinue
+          if (-not $udpListener) {
+              $taskInfo = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue
+              throw "Relay task was installed but UDP 4433 is not listening yet. Task result: $($taskInfo.LastTaskResult). Check Windows Event Viewer and the relay logs in $identityDir."
+          }
+
+          $nextSteps = @"
+          InfraLap MultiWiFi VPS relay setup completed.
+
+          VPS public IPv4: $publicHost
+          UDP port: 4433
+          Windows firewall: configured by the setup script
+          External adapter: $($external.Name)
+          Startup: relay is registered to start automatically after Windows restarts
+
+          NEXT:
+          1. In your cloud provider firewall/security-group panel, allow inbound UDP 4433.
+          2. Securely copy InfraLap-Client-Pairing.json to your laptop.
+          3. In InfraLap MultiWiFi, click Import VPS Pairing File and select that JSON file.
+          4. The app will save the server address, certificate pin and pairing token securely for this Windows user.
+
+          Keep InfraLap-Client-Pairing.json private. It contains the relay authentication token.
+          The PFX, PFX password and pairing token are stored under $identityDir with restricted folder access.
+          "@
+          [IO.File]::WriteAllText((Join-Path $relayRoot 'SETUP-NEXT-STEPS.txt'), $nextSteps, [Text.Encoding]::UTF8)
+
+          Write-Host ''
+          Write-Host 'INFRA LAP VPS RELAY SETUP COMPLETED' -ForegroundColor Green
+          Write-Host "VPS address: $publicHost"
+          Write-Host 'UDP port: 4433'
+          Write-Host 'Relay listener: active'
+          Write-Host "Pairing file: $pairingPath"
+          Write-Host ''
+          Write-Host 'IMPORTANT: Also allow inbound UDP 4433 in your cloud provider firewall/security group.'
+          Write-Host 'Copy the pairing JSON securely to your laptop, then use Import VPS Pairing File in the app.'
+          Invoke-Item -LiteralPath $identityDir
+          '@
+          [IO.File]::WriteAllText((Join-Path $relayRoot 'Setup-InfraLapRelay.ps1'), $setup, [Text.UTF8Encoding]::new($false))
+
+          $cmd = @'
+          @echo off
+          setlocal
+          net session >nul 2>&1
+          if not "%errorlevel%"=="0" (
+            powershell.exe -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+            exit /b
+          )
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Setup-InfraLapRelay.ps1"
+          if errorlevel 1 (
+            echo.
+            echo InfraLap relay setup reported an error. Review the message above.
+            pause
+          )
+          '@
+          [IO.File]::WriteAllText((Join-Path $relayRoot 'START-INFraLap-Relay-Setup.cmd'), $cmd, [Text.UTF8Encoding]::new($false))
+          Write-Host 'Added the one-click VPS relay installer and automatic startup registration.'
       - name: Compile branded Windows installer
         shell: pwsh
         run: |
