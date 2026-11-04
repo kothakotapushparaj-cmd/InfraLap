@@ -188,6 +188,9 @@ jobs:
             if (-not $window.Contains($oldBanner)) { throw 'BondingWindow status banner insertion point not found.' }
             $window = $window.Replace($oldBanner, $newBanner)
           }
+          $lineCheck = $window -split "`r?`n"
+          Write-Host '=== GENERATED BONDINGWINDOW LINES 178-190 ==='
+          for ($lineNo = 178; $lineNo -le 190 -and $lineNo -le $lineCheck.Length; $lineNo++) { Write-Host ("{0}: {1}" -f $lineNo, $lineCheck[$lineNo - 1]) }
           [IO.File]::WriteAllText($windowPath, $window, [Text.UTF8Encoding]::new($false))
 
           # Verify Windows selects the expected physical interface for the relay
