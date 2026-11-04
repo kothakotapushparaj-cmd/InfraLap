@@ -876,13 +876,12 @@ jobs:
           $xaml = [IO.File]::ReadAllText($xamlPath)
           $xaml = $xaml.Replace('2 · SELECT TWO CONNECTED WI-FI ADAPTERS', '2 · SELECT 2–5 ACTIVE INTERNET ADAPTERS')
           $xaml = $xaml.Replace('Each selected adapter creates a separately bound QUIC path to the same relay. Use two different broadband modems for additional aggregate bandwidth.', 'Each selected Wi-Fi, Ethernet or USB-modem adapter creates its own encrypted path. Select different internet connections; adapters on one router do not create extra ISP bandwidth.')
-          $statsMarker = '            </Grid>' + [Environment]::NewLine + '            <Border Background="#0A1728"'
-          $statsReplacement = '            </Grid>' + [Environment]::NewLine +
-              '            <TextBlock x:Name="AdditionalPathsText" Text="No additional paths connected." Foreground="{StaticResource Muted}" FontSize="10" TextWrapping="Wrap" Margin="0,8,0,0"/>' + [Environment]::NewLine +
-              '            <Border Background="#0A1728"'
           if (-not $xaml.Contains('x:Name="AdditionalPathsText"')) {
-            if (-not $xaml.Contains($statsMarker)) { throw 'Could not find the path-statistics XAML insertion point.' }
-            $xaml = $xaml.Replace($statsMarker, $statsReplacement)
+            $statsPattern = '(?s)(</Grid>\\s*)(<Border Background="#0A1728" BorderBrush="#38516F")'
+            $statsReplacement = '$1<TextBlock x:Name="AdditionalPathsText" Text="No additional paths connected." Foreground="{StaticResource Muted}" FontSize="10" TextWrapping="Wrap" Margin="0,8,0,0"/>$2'
+            $statsMatch = [regex]::Match($xaml, $statsPattern)
+            if (-not $statsMatch.Success) { throw 'Could not find the path-statistics XAML insertion point (whitespace-independent check).' }
+            $xaml = [regex]::Replace($xaml, $statsPattern, $statsReplacement, 1)
           }
           [IO.File]::WriteAllText($xamlPath, $xaml, [Text.UTF8Encoding]::new($false))
 
