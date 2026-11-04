@@ -83,6 +83,34 @@ jobs:
             Get-Content -Raw -Path $file.FullName
           }
 
+      - name: Inspect relay session registration and selected adapter models
+        shell: pwsh
+        run: |
+          $root = $env:V2_PROJECT_ROOT
+          $targets = @(
+            'Client/src/InfraLap.MultiWiFi.App/BondingWindow.xaml.cs',
+            'Client/src/InfraLap.MultiWiFi.App/Models/PathChoice.cs',
+            'Client/src/InfraLap.MultiWiFi.App/Services/NativeWifiService.cs',
+            'Client/src/InfraLap.MultiWiFi.App/Services/DualStaService.cs',
+            'Shared/InfraLap.MultiWiFi.Bonding/WintunPacketDevice.cs',
+            'tests/InfraLap.MultiWiFi.Bonding.Smoke/Program.cs'
+          )
+          foreach ($relative in $targets) {
+            $file = Join-Path $root $relative
+            if (Test-Path $file) {
+              Write-Host ("=== SOURCE: " + $relative + " ===")
+              Get-Content -Raw -Path $file
+            }
+          }
+          Write-Host '=== FILES CONTAINING RELAY HOST / REGISTRATION TYPES ==='
+          Get-ChildItem -Path $root -Recurse -File -Filter '*.cs' | ForEach-Object {
+            $content = Get-Content -Raw -Path $_.FullName
+            if ($content -match 'MultipathRelayHost|PeerCreated|PathHelloAck|AddPath\(') {
+              Write-Host ("=== MATCH: " + $_.FullName + " ===")
+              Write-Host $content
+            }
+          }
+
       - name: Apply System.IO compile fix and stage patched source
         shell: pwsh
         run: |
