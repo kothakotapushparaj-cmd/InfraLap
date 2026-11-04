@@ -23,7 +23,7 @@ env:
 
 jobs:
   build:
-    runs-on: windows-2022
+    runs-on: windows-latest
     timeout-minutes: 45
     steps:
       - name: Checkout v2 branch
