@@ -632,6 +632,134 @@ jobs:
           $iss = $iss.Replace('; Flags: checked', '')
           [IO.File]::WriteAllText($issPath, $iss, [Text.UTF8Encoding]::new($false))
 
+      - name: Add secure one-click VPS pairing import to the desktop app
+        shell: pwsh
+        run: |
+          $root = $env:V2_PROJECT_ROOT
+          $app = Join-Path $root 'Client/src/InfraLap.MultiWiFi.App'
+          $bondingPath = Join-Path $app 'BondingWindow.xaml.cs'
+          $bonding = [IO.File]::ReadAllText($bondingPath)
+
+          $csprojPath = Join-Path $app 'InfraLap.MultiWiFi.App.csproj'
+          $csproj = [IO.File]::ReadAllText($csprojPath)
+          if (-not $csproj.Contains('System.Security.Cryptography.ProtectedData')) {
+            $csproj = $csproj.Replace('</Project>', '  <ItemGroup>' + [Environment]::NewLine +
+              '    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />' + [Environment]::NewLine +
+              '  </ItemGroup>' + [Environment]::NewLine + '</Project>')
+            [IO.File]::WriteAllText($csprojPath, $csproj, [Text.UTF8Encoding]::new($false))
+          }
+
+          if (-not $bonding.Contains('LoadSavedRelayPairing();')) {
+            $bonding = $bonding.Replace('        AddWifiManagerLauncher();',
+              '        AddWifiManagerLauncher();' + [Environment]::NewLine + '        LoadSavedRelayPairing();')
+          }
+
+          if (-not $bonding.Contains('Content = "Import VPS Pairing File"')) {
+            $toolbarMarker = '              var hint = new System.Windows.Controls.TextBlock'
+            if (-not $bonding.Contains($toolbarMarker)) { throw 'Wi-Fi toolbar insertion point was not found.' }
+            $pairingButton = @'
+              var pairingButton = new System.Windows.Controls.Button
+              {
+                  Content = "Import VPS Pairing File",
+                  Padding = new Thickness(14, 8, 14, 8),
+                  Margin = new Thickness(0, 0, 8, 0),
+                  FontWeight = FontWeights.SemiBold,
+                  Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(22, 132, 92)),
+                  Foreground = System.Windows.Media.Brushes.White,
+                  BorderThickness = new Thickness(0),
+                  Cursor = System.Windows.Input.Cursors.Hand
+              };
+              pairingButton.Click += (_, _) => ImportRelayPairingFile();
+              System.Windows.Controls.DockPanel.SetDock(pairingButton, System.Windows.Controls.Dock.Right);
+              bar.Children.Add(pairingButton);
+'@
+            $bonding = $bonding.Replace($toolbarMarker, $pairingButton + [Environment]::NewLine + $toolbarMarker)
+          }
+
+          if (-not $bonding.Contains('private void ImportRelayPairingFile()')) {
+            $methods = @'
+          private static string RelayPairingStorePath =>
+              System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                  "InfraLap", "MultiWiFi", "relay-pairing.protected");
+
+          private void LoadSavedRelayPairing()
+          {
+              try
+              {
+                  var path = RelayPairingStorePath;
+                  if (!System.IO.File.Exists(path)) return;
+                  var protectedBytes = System.IO.File.ReadAllBytes(path);
+                  var clearBytes = System.Security.Cryptography.ProtectedData.Unprotect(
+                      protectedBytes, null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
+                  ApplyRelayPairingJson(System.Text.Encoding.UTF8.GetString(clearBytes));
+                  BondingStatus.Text = "Saved VPS pairing loaded securely for this Windows user.";
+              }
+              catch (Exception ex)
+              {
+                  BondingStatus.Text = "Saved VPS pairing could not be loaded: " + ex.Message;
+              }
+          }
+
+          private void ImportRelayPairingFile()
+          {
+              var dialog = new Microsoft.Win32.OpenFileDialog
+              {
+                  Title = "Select the InfraLap VPS pairing file",
+                  Filter = "InfraLap VPS pairing file (*.json)|*.json|All files (*.*)|*.*",
+                  CheckFileExists = true,
+                  Multiselect = false
+              };
+              if (dialog.ShowDialog(this) != true) return;
+              try
+              {
+                  var json = System.IO.File.ReadAllText(dialog.FileName);
+                  ApplyRelayPairingJson(json);
+                  var clearBytes = System.Text.Encoding.UTF8.GetBytes(json);
+                  var protectedBytes = System.Security.Cryptography.ProtectedData.Protect(
+                      clearBytes, null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
+                  var storePath = RelayPairingStorePath;
+                  System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(storePath)!);
+                  System.IO.File.WriteAllBytes(storePath, protectedBytes);
+                  BondingStatus.Text = "VPS pairing imported and saved securely. You will not need to type the pin or token again.";
+                  MessageBox.Show(this, "VPS pairing imported successfully. Server address, certificate pin and pairing token are now saved for this Windows user.",
+                      "InfraLap MultiWiFi", MessageBoxButton.OK, MessageBoxImage.Information);
+              }
+              catch (Exception ex)
+              {
+                  MessageBox.Show(this, "Pairing file could not be imported: " + ex.Message,
+                      "InfraLap pairing error", MessageBoxButton.OK, MessageBoxImage.Warning);
+              }
+          }
+
+          private void ApplyRelayPairingJson(string json)
+          {
+              using var document = System.Text.Json.JsonDocument.Parse(json);
+              var root = document.RootElement;
+              var host = root.GetProperty("serverHost").GetString()?.Trim();
+              var port = root.GetProperty("udpPort").GetInt32();
+              var pin = root.GetProperty("certificateSha256").GetString()?.Trim();
+              var token = root.GetProperty("pairingToken").GetString()?.Trim();
+              if (string.IsNullOrWhiteSpace(host)) throw new InvalidOperationException("Pairing file does not contain a server host.");
+              if (port is < 1 or > 65535) throw new InvalidOperationException("Pairing file contains an invalid UDP port.");
+              if (string.IsNullOrWhiteSpace(pin) || pin.Replace(":", "").Length != 64 ||
+                  pin.Replace(":", "").Any(ch => !Uri.IsHexDigit(ch)))
+                  throw new InvalidOperationException("Pairing file contains an invalid SHA-256 certificate pin.");
+              if (string.IsNullOrWhiteSpace(token) || token.Length < 32)
+                  throw new InvalidOperationException("Pairing file contains an invalid pairing token.");
+              RelayHostBox.Text = host;
+              RelayPortBox.Text = port.ToString(System.Globalization.CultureInfo.InvariantCulture);
+              CertificatePinBox.Text = pin;
+              TokenBox.Password = token;
+          }
+
+'@
+            $insertAt = '    private void RefreshPaths_Click(object sender, RoutedEventArgs e) => RefreshPaths();'
+            if (-not $bonding.Contains($insertAt)) { throw 'Pairing methods insertion point was not found.' }
+            $bonding = $bonding.Replace($insertAt, $methods + $insertAt)
+          }
+
+          [IO.File]::WriteAllText($bondingPath, $bonding, [Text.UTF8Encoding]::new($false))
+          Write-Host 'Added Import VPS Pairing File button and DPAPI-protected per-user settings.'
       - name: Set up .NET 10 SDK
         uses: actions/setup-dotnet@v4
         with:
