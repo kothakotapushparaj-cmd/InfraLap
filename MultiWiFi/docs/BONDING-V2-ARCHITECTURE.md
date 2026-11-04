@@ -112,3 +112,23 @@ MPTCP is a standards-based solution when both endpoints and their stacks support
 v1.2.1 does not contain a bonding tunnel, Wintun virtual adapter, relay protocol or server. v2 is designed as Windows 10/11 x64 client + Windows Server relay; the relay's virtual-adapter driver and NAT integration must be validated on the chosen Windows Server image before installer release. Its combined traffic display is an arithmetic sum of adapter counters and must not be represented as bonded throughput.
 
 This document is an engineering design, not a claim that the client or relay has been implemented or security-audited.
+
+## InfraLap Solutions brand integration
+
+Use the user's approved InfraLap Solutions logo supplied in the project. The existing v1.2.1 source package already contains a transparent full wordmark asset at:
+
+`src/InfraLap.MultiWiFi.App/Assets/InfraLap-Solutions.png`
+
+The WPF application header already references this PNG, and the Inno Setup script already references `Assets/InfraLap.ico` for installer identity. Preserve the actual supplied logo artwork; do not replace it with typed text or an AI-generated approximation.
+
+For v2, standardize branding across all Windows surfaces:
+
+- **Main application:** full transparent InfraLap Solutions wordmark in the main header, at native aspect ratio, with enough clear space; no black rectangle behind the transparent PNG.
+- **App/taskbar identity:** a square shield/emblem-only ICO derived from the approved shield mark. Do not use the wide wordmark in a square icon slot. Include standard 16, 32, 48 and 256 pixel representations where supported.
+- **Installer and uninstaller:** use the same shield ICO for SetupIconFile, UninstallDisplayIcon, Start Menu shortcut and desktop shortcut.
+- **Windows service:** display name `InfraLap MultiWiFi Bonding Service`; use InfraLap Solutions as the publisher/company, and keep the service description explicit about multi-path network tunneling.
+- **Relay manager:** use the same wordmark and shield icon, with a distinct "Relay" label so users can tell client and relay roles apart.
+- **Diagnostics and logs:** include product name, version and component role; do not put passwords, private keys, or Wi-Fi credentials into logs.
+- **Brand colors:** use the logo's blue and orange as accents, with dark navy/neutral surfaces for the technical UI. Preserve readability and accessible contrast.
+
+Brand QA must verify the main-window logo is visible on light and dark backgrounds, the icon is not stretched, installer branding matches the application, and the Windows publisher metadata consistently reads InfraLap Solutions.
