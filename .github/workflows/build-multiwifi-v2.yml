@@ -775,7 +775,7 @@ jobs:
                       n.NetworkInterfaceType != NetworkInterfaceType.Tunnel &&
                       n.NetworkInterfaceType != NetworkInterfaceType.Unknown &&
                       !System.Text.RegularExpressions.Regex.IsMatch(n.Name + " " + n.Description,
-                          @"(?i)\\b(wintun|infralap|vmware|virtualbox|hyper-v|tap-windows|wireguard|tailscale|zerotier|hamachi)\\b"))
+                          @"(?i)\b(wintun|infralap|vmware|virtualbox|hyper-v|tap-windows|wireguard|tailscale|zerotier|hamachi)\b")))
           '@
             },
             @{
