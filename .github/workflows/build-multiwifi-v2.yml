@@ -860,8 +860,15 @@ jobs:
                   _lastSample = DateTime.UtcNow;
           '@
           if (-not $window.Contains('var totalDown = firstRate.Down + secondRate.Down;')) {
-            if (-not $window.Contains($oldCounters)) { throw 'Could not find the two-path traffic counter block.' }
-            $window = $window.Replace($oldCounters, $newCounters)
+            if ($window.Contains($oldCounters)) {
+              $window = $window.Replace($oldCounters, $newCounters)
+            } else {
+              $counterPattern = '(?ms)^        var first = paths\.ElementAtOrDefault\(0\);.*?^        _lastSample = DateTime\.UtcNow;'
+              $counterMatch = [regex]::Match($window, $counterPattern)
+              if (-not $counterMatch.Success) { throw 'Could not find the two-path traffic counter block (line-ending-independent check).' }
+              $replacementText = $newCounters.TrimEnd([char[]]([string][char]13 + [char]10))
+              $window = [regex]::Replace($window, $counterPattern, [System.Text.RegularExpressions.MatchEvaluator]{ param($match) $replacementText }, 1)
+            }
           }
           [IO.File]::WriteAllText($windowPath, $window, [Text.UTF8Encoding]::new($false))
 
