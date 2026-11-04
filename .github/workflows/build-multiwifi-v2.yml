@@ -655,7 +655,7 @@ jobs:
           }
 
           if (-not $bonding.Contains('Content = "Import VPS Pairing File"')) {
-            $toolbarMarker = '              var hint = new System.Windows.Controls.TextBlock'
+            $toolbarMarker = 'var hint = new System.Windows.Controls.TextBlock'
             if (-not $bonding.Contains($toolbarMarker)) { throw 'Wi-Fi toolbar insertion point was not found.' }
             $pairingButton = @'
               var pairingButton = new System.Windows.Controls.Button
