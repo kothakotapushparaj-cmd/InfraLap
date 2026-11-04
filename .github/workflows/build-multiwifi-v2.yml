@@ -54,6 +54,15 @@ jobs:
           "V2_PROJECT_ROOT=$projectRoot" | Out-File -FilePath $env:GITHUB_ENV -Append
           Write-Host "Reassembled and verified $($parts.Count) source chunks."
 
+      - name: Apply System.IO compile fix and stage patched source
+        shell: pwsh
+        run: |
+          $codePath = Join-Path $env:V2_PROJECT_ROOT 'Client/src/InfraLap.MultiWiFi.App/BondingWindow.xaml.cs'
+          $code = [IO.File]::ReadAllText($codePath)
+          if ($code -notmatch '(?m)^using System\.IO;') {
+            [IO.File]::WriteAllText($codePath, "using System.IO;`r`n" + $code, [Text.UTF8Encoding]::new($false))
+          }
+
       - name: Set up .NET 10 SDK
         uses: actions/setup-dotnet@v4
         with:
@@ -135,7 +144,14 @@ jobs:
           Copy-Item (Join-Path $projectRoot 'scripts') (Join-Path $projectRoot 'publish/relay/scripts') -Recurse -Force
           Copy-Item (Join-Path $projectRoot 'README.md') (Join-Path $projectRoot 'publish/relay/README-RELAY-SETUP.md') -Force
           Compress-Archive -Path (Join-Path $projectRoot 'publish/relay/*') -DestinationPath (Join-Path $release 'InfraLap-MultiWiFi-Windows-Relay-v2.0.0-dev-x64.zip') -Force
-          Copy-Item $env:V2_SOURCE_ARCHIVE (Join-Path $release 'InfraLap-MultiWiFi-v2.0.0-dev-source.zip') -Force
+          $sourceStage = Join-Path $env:RUNNER_TEMP 'InfraLap-MultiWiFi-v2-source-release'
+          New-Item -ItemType Directory -Force -Path $sourceStage | Out-Null
+          foreach ($folder in @('Client','Relay','Shared','scripts','tests','installer','docs','.github')) {
+            Copy-Item (Join-Path $projectRoot $folder) $sourceStage -Recurse -Force
+          }
+          Copy-Item (Join-Path $projectRoot 'InfraLap.MultiWiFi-v2.sln') $sourceStage -Force
+          Copy-Item (Join-Path $projectRoot 'README.md') $sourceStage -Force
+          Compress-Archive -Path (Join-Path $sourceStage '*') -DestinationPath (Join-Path $release 'InfraLap-MultiWiFi-v2.0.0-dev-source.zip') -Force
           Copy-Item (Join-Path $projectRoot 'installer-output/InfraLap-MultiWiFi-Setup-v2.0.0-dev-x64.exe') $release -Force
           Get-ChildItem $release -File | Get-FileHash -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($_.Path))" } | Set-Content (Join-Path $release 'SHA256SUMS.txt')
 
