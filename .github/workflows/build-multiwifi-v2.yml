@@ -54,6 +54,35 @@ jobs:
           "V2_PROJECT_ROOT=$projectRoot" | Out-File -FilePath $env:GITHUB_ENV -Append
           Write-Host "Reassembled and verified $($parts.Count) source chunks."
 
+      - name: Inspect QUIC path binding, route scripts and relay implementation
+        shell: pwsh
+        run: |
+          $root = $env:V2_PROJECT_ROOT
+          Write-Host '=== SOURCE FILE INVENTORY ==='
+          Get-ChildItem -Path $root -Recurse -File |
+            Where-Object { $_.Extension -in @('.cs','.ps1','.xaml') } |
+            Select-Object -ExpandProperty FullName
+          $patterns = @('QuicPathLink.cs','PathDefinition.cs','WeightedPathScheduler.cs','PacketReplayWindow.cs','WintunMultipathBridge.cs','MultipathClient.cs','MultipathPeer.cs')
+          foreach ($name in $patterns) {
+            $files = @(Get-ChildItem -Path $root -Recurse -File -Filter $name)
+            foreach ($file in $files) {
+              Write-Host ("=== FILE: " + $file.FullName + " ===")
+              Get-Content -Raw -Path $file.FullName
+            }
+          }
+          Write-Host '=== ROUTE SCRIPTS ==='
+          $scripts = @(Get-ChildItem -Path (Join-Path $root 'scripts') -Recurse -File -Filter '*.ps1')
+          foreach ($file in $scripts) {
+            Write-Host ("=== SCRIPT: " + $file.Name + " ===")
+            Get-Content -Raw -Path $file.FullName
+          }
+          Write-Host '=== RELAY CSHARP SOURCES ==='
+          $relay = @(Get-ChildItem -Path (Join-Path $root 'Relay') -Recurse -File -Filter '*.cs')
+          foreach ($file in $relay) {
+            Write-Host ("=== RELAY FILE: " + $file.FullName + " ===")
+            Get-Content -Raw -Path $file.FullName
+          }
+
       - name: Apply System.IO compile fix and stage patched source
         shell: pwsh
         run: |
