@@ -760,6 +760,130 @@ jobs:
 
           [IO.File]::WriteAllText($bondingPath, $bonding, [Text.UTF8Encoding]::new($false))
           Write-Host 'Added Import VPS Pairing File button and DPAPI-protected per-user settings.'
+      - name: Enable up to five independent WAN adapters and per-path telemetry
+        shell: pwsh
+        run: |
+          $root = $env:V2_PROJECT_ROOT
+          $windowPath = Join-Path $root 'Client/src/InfraLap.MultiWiFi.App/BondingWindow.xaml.cs'
+          $window = [IO.File]::ReadAllText($windowPath)
+          $replacements = @(
+            @{
+              Old = '.Where(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 && n.OperationalStatus == OperationalStatus.Up))'
+              New = @'
+          .Where(n => n.OperationalStatus == OperationalStatus.Up &&
+                      n.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
+                      n.NetworkInterfaceType != NetworkInterfaceType.Tunnel &&
+                      n.NetworkInterfaceType != NetworkInterfaceType.Unknown &&
+                      !System.Text.RegularExpressions.Regex.IsMatch(n.Name + " " + n.Description,
+                          @"(?i)\\b(wintun|infralap|vmware|virtualbox|hyper-v|tap-windows|wireguard|tailscale|zerotier|hamachi)\\b"))
+          '@
+            },
+            @{
+              Old = '                    Description = nic.Description,'
+              New = '                    Description = $"{nic.Description} · {nic.NetworkInterfaceType}",'
+            },
+            @{
+              Old = '                    IsSelected = defaultSelected++ < 2'
+              New = '                    IsSelected = defaultSelected++ < 5'
+            },
+            @{
+              Old = '        BondingStatus.Text = $"Detected {_paths.Count} active Wi-Fi adapter(s) with IPv4 gateways. Select two independent internet connections.";'
+              New = '        BondingStatus.Text = $"Detected {_paths.Count} active wired/wireless network adapter(s) with IPv4 gateways. Select 2 to 5 independent internet connections.";'
+            },
+            @{
+              Old = '        if (selected.Length != 2) throw new InvalidOperationException("Select exactly two connected Wi-Fi adapters for this development build.");'
+              New = '        if (selected.Length is < 2 or > 5) throw new InvalidOperationException("Select between 2 and 5 active internet adapters. Use separate modem/router connections for real bandwidth aggregation.");'
+            },
+            @{
+              Old = '            if (selected[0].Gateway.Equals(selected[1].Gateway))'
+              New = '            if (selected.GroupBy(x => x.Gateway).Any(group => group.Count() > 1))'
+            },
+            @{
+              Old = '                    "Both adapters report the same default gateway address. This may mean they are connected to the same modem/router, in which case they cannot increase total broadband capacity. Continue only if these are genuinely two separate internet connections.",'
+              New = '                    "Two or more selected adapters report the same gateway address. They may share one modem/router and may not add bandwidth. Continue only when the selected adapters use genuinely independent internet uplinks.",'
+            },
+            @{
+              Old = '            BondingStatus.Text = "Resolving relay and opening a separate encrypted QUIC path on each selected Wi-Fi adapter...";'
+              New = '            BondingStatus.Text = $"Resolving relay and opening up to {selected.Length} separately bound encrypted QUIC paths...";'
+            },
+            @{
+              Old = '            BondingStatus.Text = "Both path handshakes completed. Creating the InfraLap virtual adapter...";'
+              New = '            BondingStatus.Text = $"{_client.Peer.Paths.Count} QUIC path(s) connected. Creating the single InfraLap virtual adapter...";'
+            },
+            @{
+              Old = '            BondingStatus.Text = "BONDED TUNNEL ACTIVE · IPv4 traffic is routed through InfraLap. Test with one ordinary download and verify both paths receive traffic.";'
+              New = '            BondingStatus.Text = $"BONDED TUNNEL ACTIVE · One InfraLap virtual adapter is carrying IPv4 traffic across {_client.Peer.Paths.Count} connected path(s). Verify each path receives traffic during one ordinary download.";'
+            },
+            @{
+              Old = '        Path2Traffic.Text = "↓ 0.00 Mbps · ↑ 0.00 Mbps";'
+              New = '        Path2Traffic.Text = "↓ 0.00 Mbps · ↑ 0.00 Mbps";' + [Environment]::NewLine + '        AdditionalPathsText.Text = "No additional paths connected.";'
+            }
+          )
+          foreach ($item in $replacements) {
+            if ($window.Contains($item.New)) { continue }
+            if (-not $window.Contains($item.Old)) { throw "Five-path patch marker not found: $($item.Old)" }
+            $window = $window.Replace($item.Old, $item.New)
+          }
+
+          $oldCounters = @'
+                  var first = paths.ElementAtOrDefault(0);
+                  var second = paths.ElementAtOrDefault(1);
+                  var firstRate = RenderPath(first, Path1Status, Path1Traffic, elapsed);
+                  var secondRate = RenderPath(second, Path2Status, Path2Traffic, elapsed);
+                  CombinedDownloadText.Text = $"{firstRate.Down + secondRate.Down:N2} Mbps";
+                  CombinedUploadText.Text = $"{firstRate.Up + secondRate.Up:N2} Mbps";
+                  _lastSample = DateTime.UtcNow;
+          '@
+          $newCounters = @'
+                  var first = paths.ElementAtOrDefault(0);
+                  var second = paths.ElementAtOrDefault(1);
+                  var firstRate = RenderPath(first, Path1Status, Path1Traffic, elapsed);
+                  var secondRate = RenderPath(second, Path2Status, Path2Traffic, elapsed);
+                  var totalDown = firstRate.Down + secondRate.Down;
+                  var totalUp = firstRate.Up + secondRate.Up;
+                  var additional = new List<string>();
+                  foreach (var path in paths.Skip(2))
+                  {
+                      _previous.TryGetValue(path.Name, out var previous);
+                      var down = Math.Max(0, path.BytesReceived - previous.Received) * 8d / elapsed / 1_000_000d;
+                      var up = Math.Max(0, path.BytesSent - previous.Sent) * 8d / elapsed / 1_000_000d;
+                      _previous[path.Name] = (path.BytesSent, path.BytesReceived);
+                      totalDown += down;
+                      totalUp += up;
+                      additional.Add($"{path.Name}: ↓ {down:N2} / ↑ {up:N2} Mbps · {(path.Connected ? "Connected" : "Disconnected")}");
+                  }
+                  AdditionalPathsText.Text = additional.Count == 0
+                      ? "No additional paths connected."
+                      : string.Join("   |   ", additional);
+                  CombinedDownloadText.Text = $"{totalDown:N2} Mbps";
+                  CombinedUploadText.Text = $"{totalUp:N2} Mbps";
+                  _lastSample = DateTime.UtcNow;
+          '@
+          if (-not $window.Contains('var totalDown = firstRate.Down + secondRate.Down;')) {
+            if (-not $window.Contains($oldCounters)) { throw 'Could not find the two-path traffic counter block.' }
+            $window = $window.Replace($oldCounters, $newCounters)
+          }
+          [IO.File]::WriteAllText($windowPath, $window, [Text.UTF8Encoding]::new($false))
+
+          $xamlPath = Join-Path $root 'Client/src/InfraLap.MultiWiFi.App/BondingWindow.xaml'
+          $xaml = [IO.File]::ReadAllText($xamlPath)
+          $xaml = $xaml.Replace('2 · SELECT TWO CONNECTED WI-FI ADAPTERS', '2 · SELECT 2–5 ACTIVE INTERNET ADAPTERS')
+          $xaml = $xaml.Replace('Each selected adapter creates a separately bound QUIC path to the same relay. Use two different broadband modems for additional aggregate bandwidth.', 'Each selected Wi-Fi, Ethernet or USB-modem adapter creates its own encrypted path. Select different internet connections; adapters on one router do not create extra ISP bandwidth.')
+          $statsMarker = '            </Grid>' + [Environment]::NewLine + '            <Border Background="#0A1728"'
+          $statsReplacement = '            </Grid>' + [Environment]::NewLine +
+              '            <TextBlock x:Name="AdditionalPathsText" Text="No additional paths connected." Foreground="{StaticResource Muted}" FontSize="10" TextWrapping="Wrap" Margin="0,8,0,0"/>' + [Environment]::NewLine +
+              '            <Border Background="#0A1728"'
+          if (-not $xaml.Contains('x:Name="AdditionalPathsText"')) {
+            if (-not $xaml.Contains($statsMarker)) { throw 'Could not find the path-statistics XAML insertion point.' }
+            $xaml = $xaml.Replace($statsMarker, $statsReplacement)
+          }
+          [IO.File]::WriteAllText($xamlPath, $xaml, [Text.UTF8Encoding]::new($false))
+
+          if (-not $window.Contains('selected.Length is < 2 or > 5') -or -not $window.Contains('paths.Skip(2)') -or -not $xaml.Contains('AdditionalPathsText')) {
+            throw 'Five-path UI verification failed.'
+          }
+          Write-Host 'Five-path adapter discovery, validation and per-path traffic rendering patched.'
+
       - name: Set up .NET 10 SDK
         uses: actions/setup-dotnet@v4
         with:
