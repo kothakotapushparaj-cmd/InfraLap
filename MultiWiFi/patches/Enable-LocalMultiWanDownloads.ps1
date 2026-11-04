@@ -540,8 +540,9 @@ $windowPath = Join-Path $app 'LocalMultiWanDownloadWindow.cs'
 $bondingPath = Join-Path $app 'BondingWindow.xaml.cs'
 $bonding = [IO.File]::ReadAllText($bondingPath)
 if (-not $bonding.Contains('Content = "Multi-WAN Download (No VPS)"')) {
-    $anchor = '              bar.Children.Add(button);'
-    if (-not $bonding.Contains($anchor)) { throw 'Could not locate the existing adapter toolbar button for the local download launcher.' }
+    $anchor = 'bar.Children.Add(button);'
+    $anchorIndex = $bonding.IndexOf($anchor, [StringComparison]::Ordinal)
+    if ($anchorIndex -lt 0) { throw 'Could not locate the existing adapter toolbar button for the local download launcher.' }
     $downloadButton = @'
               var localDownloadButton = new System.Windows.Controls.Button
               {
@@ -563,7 +564,7 @@ if (-not $bonding.Contains('Content = "Multi-WAN Download (No VPS)"')) {
               System.Windows.Controls.DockPanel.SetDock(localDownloadButton, System.Windows.Controls.Dock.Right);
               bar.Children.Add(localDownloadButton);
 '@
-    $bonding = $bonding.Replace($anchor, $anchor + [Environment]::NewLine + $downloadButton.TrimEnd())
+    $bonding = $bonding.Insert($anchorIndex + $anchor.Length, [Environment]::NewLine + $downloadButton.TrimEnd())
     [IO.File]::WriteAllText($bondingPath, $bonding, [Text.UTF8Encoding]::new($false))
 }
 
