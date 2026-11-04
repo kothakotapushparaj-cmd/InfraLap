@@ -218,6 +218,400 @@ jobs:
             [IO.File]::WriteAllText($routePath, $route, [Text.UTF8Encoding]::new($false))
           }
           Write-Host 'QUIC endpoint and per-adapter relay route diagnostics patched.'
+      - name: Implement adapter Wi-Fi manager and safe reconnect recovery
+        shell: pwsh
+        run: |
+          $root = $env:V2_PROJECT_ROOT
+          $app = Join-Path $root 'Client/src/InfraLap.MultiWiFi.App'
+          $bondingPath = Join-Path $app 'BondingWindow.xaml.cs'
+          $bonding = [IO.File]::ReadAllText($bondingPath)
+
+          if (-not $bonding.Contains('AddWifiManagerLauncher();')) {
+            $ctorMarker = '        InitializeComponent();'
+            if (-not $bonding.Contains($ctorMarker)) { throw 'BondingWindow constructor marker not found.' }
+            $bonding = $bonding.Replace($ctorMarker, $ctorMarker + [Environment]::NewLine + '        AddWifiManagerLauncher();')
+          }
+          if (-not $bonding.Contains('private void AddWifiManagerLauncher()')) {
+            $method = @'
+          private void AddWifiManagerLauncher()
+          {
+              if (Content is not System.Windows.UIElement originalContent) return;
+              Content = null;
+              var shell = new System.Windows.Controls.DockPanel();
+              var toolbar = new System.Windows.Controls.Border
+              {
+                  Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(15, 23, 42)),
+                  Padding = new Thickness(12, 8, 12, 8)
+              };
+              var bar = new System.Windows.Controls.DockPanel();
+              var hint = new System.Windows.Controls.TextBlock
+              {
+                  Text = "Manage Wi-Fi adapters, saved passwords and reconnection",
+                  Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(203, 213, 225)),
+                  VerticalAlignment = VerticalAlignment.Center,
+                  Margin = new Thickness(4, 0, 16, 0)
+              };
+              var button = new System.Windows.Controls.Button
+              {
+                  Content = "Wi-Fi & Password Manager",
+                  Padding = new Thickness(16, 8, 16, 8),
+                  FontWeight = FontWeights.SemiBold,
+                  Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(37, 99, 235)),
+                  Foreground = System.Windows.Media.Brushes.White,
+                  BorderThickness = new Thickness(0),
+                  Cursor = System.Windows.Input.Cursors.Hand
+              };
+              button.Click += async (_, _) =>
+              {
+                  if (_client is not null)
+                      await StopBondingAsync(showStatus: true);
+                  var manager = new WifiManagerWindow { Owner = this };
+                  manager.ShowDialog();
+                  RefreshPaths();
+              };
+              System.Windows.Controls.DockPanel.SetDock(button, System.Windows.Controls.Dock.Right);
+              bar.Children.Add(button);
+              bar.Children.Add(hint);
+              toolbar.Child = bar;
+              System.Windows.Controls.DockPanel.SetDock(toolbar, System.Windows.Controls.Dock.Top);
+              shell.Children.Add(toolbar);
+              shell.Children.Add(originalContent);
+              Content = shell;
+          }
+
+'@
+            $insertAt = '    private void RefreshPaths_Click(object sender, RoutedEventArgs e) => RefreshPaths();'
+            if (-not $bonding.Contains($insertAt)) { throw 'BondingWindow method insertion point not found.' }
+            $bonding = $bonding.Replace($insertAt, $method + $insertAt)
+          }
+
+          $oldCleanup = @'
+              if (_activeAliases.Length > 0)
+              {
+                  var script = Path.Combine(AppContext.BaseDirectory, "scripts", "Disconnect-InfraLapClient.ps1");
+                  await RunPowerShellAsync(script, new[] { "-AdapterAliases", string.Join(",", _activeAliases) });
+              }
+'@
+          $newCleanup = @'
+              var script = Path.Combine(AppContext.BaseDirectory, "scripts", "Disconnect-InfraLapClient.ps1");
+              if (File.Exists(script))
+                  await RunPowerShellAsync(script, Array.Empty<string>());
+'@
+          if (-not $bonding.Contains('await RunPowerShellAsync(script, Array.Empty<string>());')) {
+            if (-not $bonding.Contains($oldCleanup)) { throw 'StopBondingAsync cleanup block not found.' }
+            $bonding = $bonding.Replace($oldCleanup, $newCleanup)
+          }
+          $stopTail = '        if (showStatus) BondingStatus.Text = "Bonding stopped. InfraLap tunnel routes were removed; your original Wi-Fi routes remain.";'
+          if ($bonding.Contains($stopTail) -and -not $bonding.Contains($stopTail + [Environment]::NewLine + '        RefreshPaths();')) {
+            $bonding = $bonding.Replace($stopTail, '        RefreshPaths();' + [Environment]::NewLine + $stopTail)
+          }
+          [IO.File]::WriteAllText($bondingPath, $bonding, [Text.UTF8Encoding]::new($false))
+
+          $wifiManager = @'
+          using System;
+          using System.Collections.Generic;
+          using System.Linq;
+          using System.Threading.Tasks;
+          using System.Windows;
+          using System.Windows.Controls;
+          using System.Windows.Media;
+          using InfraLap.MultiWiFi.Models;
+          using InfraLap.MultiWiFi.Services;
+
+          namespace InfraLap.MultiWiFi;
+
+          public sealed class WifiManagerWindow : Window
+          {
+              private readonly NativeWifiService _wifi = new();
+              private readonly WrapPanel _cards = new();
+              private readonly TextBlock _status = new();
+              private bool _scanning;
+
+              public WifiManagerWindow()
+              {
+                  Title = "InfraLap MultiWiFi — Adapter & Password Manager";
+                  Width = 980;
+                  Height = 720;
+                  MinWidth = 760;
+                  MinHeight = 560;
+                  WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                  Background = new SolidColorBrush(Color.FromRgb(10, 16, 29));
+                  BuildLayout();
+                  Loaded += async (_, _) => await RefreshAsync();
+              }
+
+              private void BuildLayout()
+              {
+                  var root = new DockPanel { LastChildFill = true, Margin = new Thickness(18) };
+                  var header = new StackPanel { Margin = new Thickness(4, 4, 4, 14) };
+                  header.Children.Add(new TextBlock
+                  {
+                      Text = "Wi-Fi Adapter Manager",
+                      FontSize = 25,
+                      FontWeight = FontWeights.Bold,
+                      Foreground = Brushes.White
+                  });
+                  header.Children.Add(new TextBlock
+                  {
+                      Text = "Configure each physical adapter independently. Passwords are saved in Windows Wi-Fi profiles, not stored by InfraLap.",
+                      TextWrapping = TextWrapping.Wrap,
+                      Foreground = new SolidColorBrush(Color.FromRgb(165, 180, 205)),
+                      Margin = new Thickness(0, 6, 0, 10)
+                  });
+                  var refresh = MakeButton("Scan / Refresh Networks", Color.FromRgb(37, 99, 235));
+                  refresh.Click += async (_, _) => await RefreshAsync();
+                  header.Children.Add(refresh);
+                  DockPanel.SetDock(header, Dock.Top);
+                  root.Children.Add(header);
+
+                  var footer = new Border
+                  {
+                      Background = new SolidColorBrush(Color.FromRgb(18, 28, 46)),
+                      CornerRadius = new CornerRadius(10),
+                      Padding = new Thickness(12),
+                      Margin = new Thickness(0, 12, 0, 0),
+                      Child = _status
+                  };
+                  _status.Foreground = Brushes.White;
+                  _status.Text = "Ready.";
+                  _status.TextWrapping = TextWrapping.Wrap;
+                  DockPanel.SetDock(footer, Dock.Bottom);
+                  root.Children.Add(footer);
+
+                  var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+                  scroll.Content = _cards;
+                  root.Children.Add(scroll);
+                  Content = root;
+              }
+
+              private async Task RefreshAsync()
+              {
+                  if (_scanning) return;
+                  _scanning = true;
+                  _status.Text = "Scanning each Wi-Fi adapter. This can take several seconds...";
+                  try
+                  {
+                      var result = await Task.Run(() => _wifi.Scan());
+                      _cards.Children.Clear();
+                      var index = 0;
+                      foreach (var adapter in result.Interfaces)
+                      {
+                          var networks = result.Networks
+                              .Where(n => n.InterfaceGuid == adapter.InterfaceGuid)
+                              .OrderByDescending(n => n.SignalQuality)
+                              .ToList();
+                          _cards.Children.Add(BuildAdapterCard(adapter, networks, ++index));
+                      }
+                      if (index == 0)
+                          _status.Text = "No Wi-Fi interfaces were found. Check that both Wi-Fi adapters are enabled in Windows.";
+                      else
+                          _status.Text = $"Found {index} Wi-Fi adapter(s) and {result.Networks.Count} visible network entries. Choose a network on the adapter you want to configure.";
+                  }
+                  catch (Exception ex)
+                  {
+                      _status.Text = "Wi-Fi scan failed: " + ex.Message;
+                  }
+                  finally { _scanning = false; }
+              }
+
+              private Border BuildAdapterCard(WifiInterface adapter, List<WifiNetwork> networks, int number)
+              {
+                  var panel = new StackPanel();
+                  panel.Children.Add(new TextBlock
+                  {
+                      Text = $"ADAPTER {number}",
+                      FontSize = 12,
+                      FontWeight = FontWeights.Bold,
+                      Foreground = new SolidColorBrush(Color.FromRgb(96, 165, 250))
+                  });
+                  panel.Children.Add(new TextBlock
+                  {
+                      Text = adapter.Description,
+                      FontSize = 17,
+                      FontWeight = FontWeights.SemiBold,
+                      Foreground = Brushes.White,
+                      TextWrapping = TextWrapping.Wrap,
+                      Margin = new Thickness(0, 4, 0, 2)
+                  });
+                  string connectedSsid = string.Empty;
+                  try { connectedSsid = _wifi.GetConnectedSsid(adapter.InterfaceGuid); } catch { }
+                  panel.Children.Add(new TextBlock
+                  {
+                      Text = $"Windows status: {adapter.State}" + (string.IsNullOrWhiteSpace(connectedSsid) ? "" : $" · Connected to {connectedSsid}"),
+                      Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184)),
+                      TextWrapping = TextWrapping.Wrap,
+                      Margin = new Thickness(0, 0, 0, 12)
+                  });
+
+                  var networkPicker = new ComboBox
+                  {
+                      ItemsSource = networks,
+                      DisplayMemberPath = "Ssid",
+                      MinHeight = 34,
+                      Margin = new Thickness(0, 0, 0, 8)
+                  };
+                  if (networks.Count > 0)
+                  {
+                      var current = networks.FirstOrDefault(n => n.Ssid == connectedSsid);
+                      networkPicker.SelectedItem = current ?? networks[0];
+                  }
+                  panel.Children.Add(FieldLabel("Available Wi-Fi networks"));
+                  panel.Children.Add(networkPicker);
+
+                  var details = new TextBlock
+                  {
+                      Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184)),
+                      TextWrapping = TextWrapping.Wrap,
+                      Margin = new Thickness(0, 0, 0, 10)
+                  };
+                  void UpdateDetails()
+                  {
+                      if (networkPicker.SelectedItem is WifiNetwork n)
+                      {
+                          var saved = string.IsNullOrWhiteSpace(n.ProfileName) ? "No saved profile" : "Saved profile: " + n.ProfileName;
+                          details.Text = $"{n.Ssid} · Signal {n.SignalQuality}% · {n.Authentication} · {saved}";
+                      }
+                      else details.Text = "No visible network selected.";
+                  }
+                  networkPicker.SelectionChanged += (_, _) => UpdateDetails();
+                  UpdateDetails();
+                  panel.Children.Add(details);
+
+                  panel.Children.Add(FieldLabel("New or updated Wi-Fi password"));
+                  var password = new PasswordBox { MinHeight = 34, Margin = new Thickness(0, 0, 0, 8) };
+                  panel.Children.Add(password);
+                  var autoConnect = new CheckBox
+                  {
+                      Content = "Connect automatically",
+                      IsChecked = true,
+                      Foreground = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+                      Margin = new Thickness(0, 0, 0, 10)
+                  };
+                  panel.Children.Add(autoConnect);
+
+                  var connectSaved = MakeButton("Connect Using Saved Password", Color.FromRgb(51, 65, 85));
+                  connectSaved.Margin = new Thickness(0, 3, 0, 3);
+                  connectSaved.Click += async (_, _) =>
+                  {
+                      if (networkPicker.SelectedItem is not WifiNetwork selected) { _status.Text = "Select a network first."; return; }
+                      if (string.IsNullOrWhiteSpace(selected.ProfileName)) { _status.Text = "No saved password/profile for this network. Enter the password and choose Save & Connect."; return; }
+                      await RunCardActionAsync(async () =>
+                      {
+                          _status.Text = $"Connecting {adapter.Description} to {selected.Ssid}...";
+                          _status.Text = await _wifi.ConnectAndVerifyAsync(adapter.InterfaceGuid, selected.ProfileName, selected.Ssid);
+                      });
+                  };
+                  panel.Children.Add(connectSaved);
+
+                  var saveConnect = MakeButton("Save / Update Password & Connect", Color.FromRgb(22, 163, 74));
+                  saveConnect.Margin = new Thickness(0, 3, 0, 3);
+                  saveConnect.Click += async (_, _) =>
+                  {
+                      if (networkPicker.SelectedItem is not WifiNetwork selected) { _status.Text = "Select a network first."; return; }
+                      await RunCardActionAsync(async () =>
+                      {
+                          var profile = await Task.Run(() => _wifi.SaveOrUpdateProfile(adapter.InterfaceGuid, selected, password.Password, autoConnect.IsChecked == true));
+                          _status.Text = $"Saved Windows Wi-Fi profile '{profile}'. Reconnecting...";
+                          _status.Text = await _wifi.ConnectAndVerifyAsync(adapter.InterfaceGuid, profile, selected.Ssid);
+                          password.Clear();
+                      });
+                  };
+                  panel.Children.Add(saveConnect);
+
+                  var row = new WrapPanel { Margin = new Thickness(0, 4, 0, 0) };
+                  var disconnect = MakeButton("Disconnect", Color.FromRgb(185, 28, 28));
+                  disconnect.Margin = new Thickness(0, 3, 6, 3);
+                  disconnect.Click += async (_, _) =>
+                  {
+                      await RunCardActionAsync(async () =>
+                      {
+                          _status.Text = _wifi.Disconnect(adapter.InterfaceGuid);
+                          await Task.Delay(500);
+                      });
+                  };
+                  row.Children.Add(disconnect);
+
+                  var forget = MakeButton("Forget Saved Profile", Color.FromRgb(71, 85, 105));
+                  forget.Margin = new Thickness(0, 3, 0, 3);
+                  forget.Click += async (_, _) =>
+                  {
+                      if (networkPicker.SelectedItem is not WifiNetwork selected) { _status.Text = "Select a network first."; return; }
+                      if (string.IsNullOrWhiteSpace(selected.ProfileName)) { _status.Text = "This network has no saved profile to forget."; return; }
+                      var answer = MessageBox.Show(this, $"Forget the saved profile '{selected.ProfileName}' on {adapter.Description}?", "Confirm", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                      if (answer != MessageBoxResult.Yes) return;
+                      await RunCardActionAsync(async () =>
+                      {
+                          _status.Text = _wifi.ForgetProfile(adapter.InterfaceGuid, selected.ProfileName);
+                          await Task.Delay(300);
+                          await RefreshAsync();
+                      });
+                  };
+                  row.Children.Add(forget);
+                  panel.Children.Add(row);
+
+                  return new Border
+                  {
+                      Width = 430,
+                      Margin = new Thickness(8),
+                      Padding = new Thickness(18),
+                      CornerRadius = new CornerRadius(16),
+                      BorderThickness = new Thickness(1),
+                      BorderBrush = new SolidColorBrush(Color.FromRgb(43, 57, 78)),
+                      Background = new SolidColorBrush(Color.FromRgb(17, 27, 45)),
+                      Child = panel
+                  };
+              }
+
+              private async Task RunCardActionAsync(Func<Task> action)
+              {
+                  try { await action(); }
+                  catch (Exception ex) { _status.Text = "Wi-Fi operation failed: " + ex.Message; }
+              }
+
+              private static TextBlock FieldLabel(string text) => new()
+              {
+                  Text = text,
+                  Foreground = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+                  FontWeight = FontWeights.SemiBold,
+                  Margin = new Thickness(0, 5, 0, 4)
+              };
+
+              private static Button MakeButton(string text, Color color) => new()
+              {
+                  Content = text,
+                  Padding = new Thickness(12, 8, 12, 8),
+                  MinHeight = 34,
+                  Background = new SolidColorBrush(color),
+                  Foreground = Brushes.White,
+                  BorderThickness = new Thickness(0),
+                  FontWeight = FontWeights.SemiBold,
+                  Cursor = System.Windows.Input.Cursors.Hand
+              };
+          }
+'@
+          $wifiPath = Join-Path $app 'WifiManagerWindow.cs'
+          [IO.File]::WriteAllText($wifiPath, $wifiManager, [Text.UTF8Encoding]::new($false))
+
+          $connectPath = Join-Path $root 'scripts/Connect-InfraLapClient.ps1'
+          $connect = [IO.File]::ReadAllText($connectPath)
+          $oldGuard = @'
+          if (Test-Path $statePath) { throw 'An InfraLap tunnel network state already exists. Stop/restore the previous tunnel before connecting again.' }
+'@
+          $newGuard = @'
+          if (Test-Path $statePath) {
+              Write-Warning 'A previous InfraLap network state was found. Attempting safe recovery before reconnecting.'
+              $recoveryScript = Join-Path $PSScriptRoot 'Disconnect-InfraLapClient.ps1'
+              if (-not (Test-Path $recoveryScript)) { throw "Recovery script is missing: $recoveryScript" }
+              & $recoveryScript -TunnelAlias $TunnelAlias -TunnelAddress $TunnelAddress -RelayTunnelAddress $RelayTunnelAddress
+              if (Test-Path $statePath) { throw "Previous InfraLap network state could not be cleared. Review $statePath before retrying." }
+          }
+'@
+          if (-not $connect.Contains('Attempting safe recovery before reconnecting.')) {
+              if (-not $connect.Contains($oldGuard.Trim())) { throw 'Existing stale-state guard not found in Connect-InfraLapClient.ps1.' }
+              $connect = $connect.Replace($oldGuard.Trim(), $newGuard.TrimEnd())
+              [IO.File]::WriteAllText($connectPath, $connect, [Text.UTF8Encoding]::new($false))
+          }
+          Write-Host 'Wi-Fi manager and reconnect recovery code staged.'
       - name: Apply System.IO compile fix and stage patched source
         shell: pwsh
         run: |
