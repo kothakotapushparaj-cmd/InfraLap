@@ -8,6 +8,7 @@ on:
     paths:
       - 'MultiWiFi/v2-source.parts/**'
       - 'MultiWiFi/docs/**'
+      - 'MultiWiFi/patches/**'
       - '.github/workflows/build-multiwifi-v2.yml'
 
 permissions:
@@ -892,6 +893,13 @@ jobs:
             throw 'Five-path UI verification failed.'
           }
           Write-Host 'Five-path adapter discovery, validation and per-path traffic rendering patched.'
+
+      - name: Add VPS-free local multi-WAN range download mode
+        shell: pwsh
+        run: |
+          $patch = Join-Path $env:GITHUB_WORKSPACE 'MultiWiFi/patches/Enable-LocalMultiWanDownloads.ps1'
+          if (!(Test-Path $patch)) { throw "Local multi-WAN patch script not found: $patch" }
+          & $patch
 
       - name: Set up .NET 10 SDK
         uses: actions/setup-dotnet@v4
