@@ -402,7 +402,7 @@ jobs:
                       foreach (var adapter in result.Interfaces)
                       {
                           var networks = result.Networks
-                              .Where(n => n.InterfaceGuid == adapter.InterfaceGuid)
+                              .Where(n => n.InterfaceId == adapter.Id)
                               .OrderByDescending(n => n.SignalQuality)
                               .ToList();
                           _cards.Children.Add(BuildAdapterCard(adapter, networks, ++index));
@@ -439,7 +439,7 @@ jobs:
                       Margin = new Thickness(0, 4, 0, 2)
                   });
                   string connectedSsid = string.Empty;
-                  try { connectedSsid = _wifi.GetConnectedSsid(adapter.InterfaceGuid); } catch { }
+                  try { connectedSsid = _wifi.GetConnectedSsid(adapter.Id); } catch { }
                   panel.Children.Add(new TextBlock
                   {
                       Text = $"Windows status: {adapter.State}" + (string.IsNullOrWhiteSpace(connectedSsid) ? "" : $" · Connected to {connectedSsid}"),
@@ -503,7 +503,7 @@ jobs:
                       await RunCardActionAsync(async () =>
                       {
                           _status.Text = $"Connecting {adapter.Description} to {selected.Ssid}...";
-                          _status.Text = await _wifi.ConnectAndVerifyAsync(adapter.InterfaceGuid, selected.ProfileName, selected.Ssid);
+                          _status.Text = await _wifi.ConnectAndVerifyAsync(adapter.Id, selected.ProfileName, selected.Ssid);
                       });
                   };
                   panel.Children.Add(connectSaved);
@@ -517,9 +517,9 @@ jobs:
                       {
                           var newPassword = password.Password;
                           var shouldConnectAutomatically = autoConnect.IsChecked == true;
-                          var profile = await Task.Run(() => _wifi.SaveOrUpdateProfile(adapter.InterfaceGuid, selected, newPassword, shouldConnectAutomatically));
+                          var profile = await Task.Run(() => _wifi.SaveOrUpdateProfile(adapter.Id, selected, newPassword, shouldConnectAutomatically));
                           _status.Text = $"Saved Windows Wi-Fi profile '{profile}'. Reconnecting...";
-                          _status.Text = await _wifi.ConnectAndVerifyAsync(adapter.InterfaceGuid, profile, selected.Ssid);
+                          _status.Text = await _wifi.ConnectAndVerifyAsync(adapter.Id, profile, selected.Ssid);
                           password.Clear();
                       });
                   };
@@ -532,7 +532,7 @@ jobs:
                   {
                       await RunCardActionAsync(async () =>
                       {
-                          _status.Text = _wifi.Disconnect(adapter.InterfaceGuid);
+                          _status.Text = _wifi.Disconnect(adapter.Id);
                           await Task.Delay(500);
                       });
                   };
@@ -548,7 +548,7 @@ jobs:
                       if (answer != MessageBoxResult.Yes) return;
                       await RunCardActionAsync(async () =>
                       {
-                          _status.Text = _wifi.ForgetProfile(adapter.InterfaceGuid, selected.ProfileName);
+                          _status.Text = _wifi.ForgetProfile(adapter.Id, selected.ProfileName);
                           await Task.Delay(300);
                           await RefreshAsync();
                       });
