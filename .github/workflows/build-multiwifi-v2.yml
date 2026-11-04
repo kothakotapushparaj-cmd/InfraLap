@@ -62,6 +62,10 @@ jobs:
           if ($code -notmatch '(?m)^using System\.IO;') {
             [IO.File]::WriteAllText($codePath, "using System.IO;`r`n" + $code, [Text.UTF8Encoding]::new($false))
           }
+          $issPath = Join-Path $env:V2_PROJECT_ROOT 'installer/InfraLap-MultiWiFi-v2.iss'
+          $iss = [IO.File]::ReadAllText($issPath)
+          $iss = $iss.Replace('; Flags: checked', '')
+          [IO.File]::WriteAllText($issPath, $iss, [Text.UTF8Encoding]::new($false))
 
       - name: Set up .NET 10 SDK
         uses: actions/setup-dotnet@v4
