@@ -485,8 +485,9 @@ public sealed class LocalMultiWanDownloadWindow : Window
         }
         catch (Exception ex)
         {
-            _status.Text = "Download failed: " + ex.Message;
-            MessageBox.Show(this, ex.Message, "InfraLap VPS-free download", MessageBoxButton.OK, MessageBoxImage.Warning);
+            var detail = DescribeException(ex);
+            _status.Text = "Download failed: " + detail;
+            MessageBox.Show(this, detail, "InfraLap VPS-free download", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
         {
@@ -496,6 +497,19 @@ public sealed class LocalMultiWanDownloadWindow : Window
             _cancel.IsEnabled = false;
             _progress.IsIndeterminate = false;
         }
+    }
+
+    private static string DescribeException(Exception exception)
+    {
+        var messages = new List<string>();
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            var message = current.Message;
+            if (current is System.Net.Sockets.SocketException socket)
+                message += $" (SocketError: {socket.SocketErrorCode}; native code: {socket.NativeErrorCode})";
+            messages.Add($"{current.GetType().Name}: {message}");
+        }
+        return string.Join(Environment.NewLine + "Caused by: ", messages);
     }
 
     private void BrowseDestination()
