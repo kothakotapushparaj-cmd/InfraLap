@@ -302,8 +302,9 @@ jobs:
                   await RunPowerShellAsync(script, Array.Empty<string>());
           '@
           if (-not $bonding.Contains('await RunPowerShellAsync(script, Array.Empty<string>());')) {
-            if (-not $bonding.Contains($oldCleanup)) { throw 'StopBondingAsync cleanup block not found.' }
-            $bonding = $bonding.Replace($oldCleanup, $newCleanup)
+            $cleanupPattern = '(?ms)^[ 	]*if\s*\(_activeAliases\.Length\s*>\s*0\)\s*\{\s*var\s+script\s*=\s*Path\.Combine\(AppContext\.BaseDirectory,\s*"scripts",\s*"Disconnect-InfraLapClient\.ps1"\);\s*await\s+RunPowerShellAsync\(script,\s*new\[\]\s*\{\s*"-AdapterAliases",\s*string\.Join\(",",\s*_activeAliases\)\s*\}\);\s*\}'
+            if (-not [regex]::IsMatch($bonding, $cleanupPattern)) { throw 'StopBondingAsync cleanup block not found (regex recovery check).' }
+            $bonding = [regex]::Replace($bonding, $cleanupPattern, $newCleanup.Trim(), 1)
           }
           $stopTail = '        if (showStatus) BondingStatus.Text = "Bonding stopped. InfraLap tunnel routes were removed; your original Wi-Fi routes remain.";'
           if ($bonding.Contains($stopTail) -and -not $bonding.Contains($stopTail + [Environment]::NewLine + '        RefreshPaths();')) {
