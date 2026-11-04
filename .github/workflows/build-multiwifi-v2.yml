@@ -279,7 +279,7 @@ jobs:
               Content = shell;
           }
 
-'@
+          '@
             $insertAt = '    private void RefreshPaths_Click(object sender, RoutedEventArgs e) => RefreshPaths();'
             if (-not $bonding.Contains($insertAt)) { throw 'BondingWindow method insertion point not found.' }
             $bonding = $bonding.Replace($insertAt, $method + $insertAt)
@@ -291,12 +291,12 @@ jobs:
                   var script = Path.Combine(AppContext.BaseDirectory, "scripts", "Disconnect-InfraLapClient.ps1");
                   await RunPowerShellAsync(script, new[] { "-AdapterAliases", string.Join(",", _activeAliases) });
               }
-'@
+          '@
           $newCleanup = @'
               var script = Path.Combine(AppContext.BaseDirectory, "scripts", "Disconnect-InfraLapClient.ps1");
               if (File.Exists(script))
                   await RunPowerShellAsync(script, Array.Empty<string>());
-'@
+          '@
           if (-not $bonding.Contains('await RunPowerShellAsync(script, Array.Empty<string>());')) {
             if (-not $bonding.Contains($oldCleanup)) { throw 'StopBondingAsync cleanup block not found.' }
             $bonding = $bonding.Replace($oldCleanup, $newCleanup)
@@ -588,7 +588,7 @@ jobs:
                   Cursor = System.Windows.Input.Cursors.Hand
               };
           }
-'@
+          '@
           $wifiPath = Join-Path $app 'WifiManagerWindow.cs'
           [IO.File]::WriteAllText($wifiPath, $wifiManager, [Text.UTF8Encoding]::new($false))
 
@@ -596,7 +596,7 @@ jobs:
           $connect = [IO.File]::ReadAllText($connectPath)
           $oldGuard = @'
           if (Test-Path $statePath) { throw 'An InfraLap tunnel network state already exists. Stop/restore the previous tunnel before connecting again.' }
-'@
+          '@
           $newGuard = @'
           if (Test-Path $statePath) {
               Write-Warning 'A previous InfraLap network state was found. Attempting safe recovery before reconnecting.'
@@ -605,7 +605,7 @@ jobs:
               & $recoveryScript -TunnelAlias $TunnelAlias -TunnelAddress $TunnelAddress -RelayTunnelAddress $RelayTunnelAddress
               if (Test-Path $statePath) { throw "Previous InfraLap network state could not be cleared. Review $statePath before retrying." }
           }
-'@
+          '@
           if (-not $connect.Contains('Attempting safe recovery before reconnecting.')) {
               if (-not $connect.Contains($oldGuard.Trim())) { throw 'Existing stale-state guard not found in Connect-InfraLapClient.ps1.' }
               $connect = $connect.Replace($oldGuard.Trim(), $newGuard.TrimEnd())
